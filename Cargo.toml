@@ -1,0 +1,16 @@
+[package]
+name = "dmi"
+version = "0.1.0"
+edition = "2018"
+license = "MIT"
+description = "DMI library written in Rust. Provides helpers to manipulate and produce DMI format files."
+authors = ["Rohesie <rohesie@gmail.com>"]
+keywords = ["byond", "dreammaker", "dmi", "spacestation13"]
+homepage = "https://github.com/Rohesie/dmi"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0.22"
+image = "0.23.6"
+deflate = "0.8.6"
+inflate = "0.4.5"
