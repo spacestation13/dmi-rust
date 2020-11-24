@@ -7,6 +7,7 @@ description = "DMI library written in Rust. Provides helpers to manipulate and p
 authors = ["Rohesie <rohesie@gmail.com>"]
 keywords = ["byond", "dreammaker", "dmi", "spacestation13"]
 homepage = "https://github.com/Rohesie/dmi"
+exclude = ["src/tests.rs", "tests/*"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

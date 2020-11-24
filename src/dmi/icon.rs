@@ -113,11 +113,11 @@ impl Icon {
 
 		let mut index = 0;
 
-		let current_line = match decompressed_text.next() {
+		let mut current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
 				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no DMI trailer found."
+					"Error loading icon: no DMI trailer nor states found."
 				)))
 			}
 		};
@@ -125,7 +125,7 @@ impl Icon {
 		let mut states = vec![];
 
 		loop {
-			if current_line == "# END DMI" {
+			if current_line.contains("# END DMI") {
 				break;
 			};
 
@@ -157,7 +157,7 @@ impl Icon {
 			let mut unknown_settings = None;
 
 			loop {
-				let current_line = match decompressed_text.next() {
+				current_line = match decompressed_text.next() {
 					Some(thing) => thing,
 					None => {
 						return Err(error::DmiError::Generic(format!(
@@ -166,7 +166,7 @@ impl Icon {
 					}
 				};
 
-				if current_line == "# END DMI" {
+				if current_line.contains("# END DMI") {
 					break;
 				};
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
