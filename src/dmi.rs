@@ -2,25 +2,33 @@ pub mod chunk;
 pub mod crc;
 pub mod error;
 pub mod icon;
+pub mod iend;
 pub mod ztxt;
 
 use std::convert::TryFrom;
 use std::io::prelude::*;
 
 /// The PNG magic header
-pub const MAGIC: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+pub const PNG_HEADER: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct RawDmi {
 	pub header: [u8; 8],
 	pub chunk_ihdr: chunk::RawGenericChunk,
 	pub chunk_ztxt: Option<ztxt::RawZtxtChunk>,
-	pub chunk_idat: chunk::RawGenericChunk,
-	pub chunk_iend: chunk::RawGenericChunk,
+	pub chunk_plte: Option<chunk::RawGenericChunk>,
 	pub other_chunks: Vec<chunk::RawGenericChunk>,
+	pub chunk_idat: chunk::RawGenericChunk,
+	pub chunk_iend: iend::RawIendChunk,
 }
 
 impl RawDmi {
+	pub fn new() -> RawDmi {
+		RawDmi {
+			..Default::default()
+		}
+	}
+
 	pub fn load<R: Read>(mut reader: R) -> Result<RawDmi, error::DmiError> {
 		let mut dmi_bytes = Vec::new();
 		reader.read_to_end(&mut dmi_bytes)?;
@@ -37,15 +45,16 @@ impl RawDmi {
 		};
 
 		let header = &dmi_bytes[0..8];
-		if dmi_bytes[0..8] != MAGIC {
+		if dmi_bytes[0..8] != PNG_HEADER {
 			return Err(error::DmiError::Generic(format!(
 				"PNG header mismatch (expected {:#?}, found {:#?})",
-				MAGIC, header
+				PNG_HEADER, header
 			)));
 		};
-		let header = MAGIC;
+		let header = PNG_HEADER;
 		let mut chunk_ihdr = None;
 		let mut chunk_ztxt = None;
+		let mut chunk_plte = None;
 		let mut chunk_idat = None;
 		let chunk_iend;
 		let mut other_chunks = vec![];
@@ -76,9 +85,10 @@ impl RawDmi {
 			match &raw_chunk.chunk_type {
 				b"IHDR" => chunk_ihdr = Some(raw_chunk),
 				b"zTXt" => chunk_ztxt = Some(ztxt::RawZtxtChunk::try_from(raw_chunk)?),
+				b"PLTE" => chunk_plte = Some(raw_chunk),
 				b"IDAT" => chunk_idat = Some(raw_chunk),
 				b"IEND" => {
-					chunk_iend = Some(raw_chunk);
+					chunk_iend = Some(iend::RawIendChunk::try_from(raw_chunk)?);
 					break;
 				}
 				_ => other_chunks.push(raw_chunk),
@@ -95,9 +105,10 @@ impl RawDmi {
 			header,
 			chunk_ihdr,
 			chunk_ztxt,
+			chunk_plte,
+			other_chunks,
 			chunk_idat,
 			chunk_iend,
-			other_chunks,
 		})
 	}
 
@@ -151,5 +162,4 @@ impl RawDmi {
 
 		Ok(total_bytes_written)
 	}
-
 }
