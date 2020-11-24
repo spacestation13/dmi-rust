@@ -109,7 +109,9 @@ impl Icon {
 			return Err(error::DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
 		};
 
-		let max_possible_states = (img_width / width) * (img_height / height);
+		let width_in_states = img_width / width;
+		let height_in_states = img_height / height;
+		let max_possible_states = width_in_states * height_in_states;
 
 		let mut index = 0;
 
@@ -242,8 +244,8 @@ impl Icon {
 
 			for _frame in 0..frames {
 				for _dir in 0..dirs {
-					let x = (index * width) % img_width;
-					let y = (index * height) / img_height;
+					let x = (index % width_in_states) * width;
+					let y = (index / height_in_states) * height;
 					images.push(base_image.crop_imm(x, y, width, height));
 					index += 1;
 				}
