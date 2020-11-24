@@ -245,7 +245,8 @@ impl Icon {
 			for _frame in 0..frames {
 				for _dir in 0..dirs {
 					let x = (index % width_in_states) * width;
-					let y = (index / height_in_states) * height;
+					//This operation rounds towards zero, truncating any fractional part of the exact result, essentially a floor() function.
+					let y = (index / width_in_states) * height;
 					images.push(base_image.crop_imm(x, y, width, height));
 					index += 1;
 				}
