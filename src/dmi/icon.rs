@@ -166,7 +166,7 @@ impl Icon {
 					}
 				};
 
-				if current_line.contains("# END DMI") {
+				if current_line.contains("# END DMI") || current_line.contains("state = \"") {
 					break;
 				};
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
