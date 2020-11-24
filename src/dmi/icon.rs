@@ -144,7 +144,7 @@ impl Icon {
 			let name = match name.len() {
 				0 | 1 => return Err(error::DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}", name))),
 				2 => String::new(), //Only the quotes, empty name otherwise.
-				length @ _ => String::from_utf8(name[1..length].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
+				length @ _ => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
 			};
 
 			let mut dirs = None;
