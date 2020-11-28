@@ -142,6 +142,25 @@ impl RawDmi {
 			None => (),
 		};
 
+		match &self.chunk_plte {
+			Some(chunk_plte) => {
+				let bytes_written = chunk_plte.save(&mut writter)?;
+				total_bytes_written += bytes_written;
+				if bytes_written < u32::from_be_bytes(chunk_plte.data_length) as usize + 12 {
+					return Err(error::DmiError::Generic(format!("Failed to save DMI. Buffer unable to hold the data, only {} bytes written.", total_bytes_written)));
+				};
+			}
+			None => (),
+		};
+
+		for chunk in &self.other_chunks {
+			let bytes_written = chunk.save(&mut writter)?;
+			total_bytes_written += bytes_written;
+			if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
+				return Err(error::DmiError::Generic(format!("Failed to save DMI. Buffer unable to hold the data, only {} bytes written.", total_bytes_written)));
+			};
+		};
+
 		let bytes_written = self.chunk_idat.save(&mut writter)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.chunk_idat.data_length) as usize + 12 {
