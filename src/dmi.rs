@@ -17,8 +17,8 @@ pub struct RawDmi {
 	pub chunk_ihdr: chunk::RawGenericChunk,
 	pub chunk_ztxt: Option<ztxt::RawZtxtChunk>,
 	pub chunk_plte: Option<chunk::RawGenericChunk>,
-	pub other_chunks: Vec<chunk::RawGenericChunk>,
-	pub chunk_idat: chunk::RawGenericChunk,
+	pub other_chunks: Option<Vec<chunk::RawGenericChunk>>,
+	pub chunks_idat: Vec<chunk::RawGenericChunk>,
 	pub chunk_iend: iend::RawIendChunk,
 }
 
@@ -55,7 +55,7 @@ impl RawDmi {
 		let mut chunk_ihdr = None;
 		let mut chunk_ztxt = None;
 		let mut chunk_plte = None;
-		let mut chunk_idat = None;
+		let mut chunks_idat = vec![];
 		let chunk_iend;
 		let mut other_chunks = vec![];
 
@@ -86,7 +86,7 @@ impl RawDmi {
 				b"IHDR" => chunk_ihdr = Some(raw_chunk),
 				b"zTXt" => chunk_ztxt = Some(ztxt::RawZtxtChunk::try_from(raw_chunk)?),
 				b"PLTE" => chunk_plte = Some(raw_chunk),
-				b"IDAT" => chunk_idat = Some(raw_chunk),
+				b"IDAT" => chunks_idat.push(raw_chunk),
 				b"IEND" => {
 					chunk_iend = Some(iend::RawIendChunk::try_from(raw_chunk)?);
 					break;
@@ -94,11 +94,21 @@ impl RawDmi {
 				_ => other_chunks.push(raw_chunk),
 			}
 		}
-		if chunk_ihdr == None || chunk_idat == None {
-			return Err(error::DmiError::Generic(format!("Failed to load DMI. Buffer end reached without finding a necessary chunk.\nIHDR: {:#?}\nIDAT: {:#?}", chunk_ihdr, chunk_idat)));
+		if chunk_ihdr == None {
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load DMI. Buffer end reached without finding an IHDR chunk."
+			)));
+		};
+		if chunks_idat.len() == 0 {
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load DMI. Buffer end reached without finding an IDAT chunk."
+			)));
+		}
+		let other_chunks = match other_chunks.len() {
+			0 => None,
+			_ => Some(other_chunks),
 		};
 		let chunk_ihdr = chunk_ihdr.unwrap();
-		let chunk_idat = chunk_idat.unwrap();
 		let chunk_iend = chunk_iend.unwrap();
 
 		Ok(RawDmi {
@@ -107,7 +117,7 @@ impl RawDmi {
 			chunk_ztxt,
 			chunk_plte,
 			other_chunks,
-			chunk_idat,
+			chunks_idat,
 			chunk_iend,
 		})
 	}
@@ -153,22 +163,32 @@ impl RawDmi {
 			None => (),
 		};
 
-		for chunk in &self.other_chunks {
+		match &self.other_chunks {
+			Some(other_chunks) => {
+				for chunk in other_chunks {
+					let bytes_written = chunk.save(&mut writter)?;
+					total_bytes_written += bytes_written;
+					if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
+						return Err(error::DmiError::Generic(format!(
+					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
+					total_bytes_written
+				)));
+					};
+				}
+			}
+			None => (),
+		}
+
+		for chunk in &self.chunks_idat {
 			let bytes_written = chunk.save(&mut writter)?;
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
-				return Err(error::DmiError::Generic(format!("Failed to save DMI. Buffer unable to hold the data, only {} bytes written.", total_bytes_written)));
+				return Err(error::DmiError::Generic(format!(
+					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
+					total_bytes_written
+				)));
 			};
-		};
-
-		let bytes_written = self.chunk_idat.save(&mut writter)?;
-		total_bytes_written += bytes_written;
-		if bytes_written < u32::from_be_bytes(self.chunk_idat.data_length) as usize + 12 {
-			return Err(error::DmiError::Generic(format!(
-				"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
-			)));
-		};
+		}
 
 		let bytes_written = self.chunk_iend.save(&mut writter)?;
 		total_bytes_written += bytes_written;
