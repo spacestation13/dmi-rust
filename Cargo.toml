@@ -13,5 +13,5 @@ exclude = ["src/tests.rs", "tests/*"]
 [dependencies]
 thiserror = "1.0"
 image = "0.23"
-deflate = "0.8"
+deflate = "0.9"
 inflate = "0.4"
