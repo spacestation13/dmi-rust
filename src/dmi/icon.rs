@@ -21,7 +21,9 @@ impl Icon {
 		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
 			Some(chunk) => chunk.clone(),
 			None => {
-				return Err(error::DmiError::Generic("Error loading icon: no zTXt chunk found.".to_string()))
+				return Err(error::DmiError::Generic(
+					"Error loading icon: no zTXt chunk found.".to_string(),
+				))
 			}
 		};
 		let decompressed_text = chunk_ztxt.data.decode()?;
@@ -39,7 +41,9 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic("Error loading icon: no version header found.".to_string()))
+				return Err(error::DmiError::Generic(
+					"Error loading icon: no version header found.".to_string(),
+				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -54,7 +58,9 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic("Error loading icon: no width found.".to_string()))
+				return Err(error::DmiError::Generic(
+					"Error loading icon: no width found.".to_string(),
+				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -69,7 +75,9 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic("Error loading icon: no height found.".to_string()))
+				return Err(error::DmiError::Generic(
+					"Error loading icon: no height found.".to_string(),
+				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -110,7 +118,9 @@ impl Icon {
 		let mut current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic("Error loading icon: no DMI trailer nor states found.".to_string()))
+				return Err(error::DmiError::Generic(
+					"Error loading icon: no DMI trailer nor states found.".to_string(),
+				))
 			}
 		};
 
@@ -157,7 +167,9 @@ impl Icon {
 				current_line = match decompressed_text.next() {
 					Some(thing) => thing,
 					None => {
-						return Err(error::DmiError::Generic("Error loading icon: no DMI trailer found.".to_string()))
+						return Err(error::DmiError::Generic(
+							"Error loading icon: no DMI trailer found.".to_string(),
+						))
 					}
 				};
 
@@ -291,26 +303,22 @@ impl Icon {
 					},
 					None => return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
-				match icon_state.loop_flag {
-					Some(flag) => signature.push_str(&format!("\tloop = {}\n", flag)),
-					None => (),
-				};
-				match icon_state.rewind {
-					Some(flag) => signature.push_str(&format!("\trewind = {}\n", flag)),
-					None => (),
-				};
-				match icon_state.movement {
-					Some(flag) => signature.push_str(&format!("\trewind = {}\n", flag)),
-					None => (),
-				};
+				if let Some(flag) = icon_state.loop_flag {
+					signature.push_str(&format!("\tloop = {}\n", flag))
+				}
+				if let Some(flag) = icon_state.rewind {
+					signature.push_str(&format!("\trewind = {}\n", flag))
+				}
+				if let Some(flag) = icon_state.movement {
+					signature.push_str(&format!("\trewind = {}\n", flag))
+				}
 			};
 
-			match icon_state.hotspot {
-				Some(array) => signature.push_str(&format!(
+			if let Some(array) = icon_state.hotspot {
+				signature.push_str(&format!(
 					"\tarray = {},{},{}\n",
 					array[0], array[1], array[2]
-				)),
-				None => (),
+				))
 			};
 
 			match &icon_state.unknown_settings {
@@ -331,15 +339,15 @@ impl Icon {
 		let mut new_png =
 			image::DynamicImage::new_rgba8(max_index * self.width, max_index * self.height);
 
-		let mut index = 0;
-		for image in sprites.iter() {
+		for image in sprites.iter().enumerate() {
+			let index = image.0 as u32;
+			let image = image.1;
 			imageops::replace(
 				&mut new_png,
 				*image,
 				self.width * (index % max_index),
 				self.height * (index / max_index),
 			);
-			index += 1;
 		}
 
 		let mut new_dmi = vec![];

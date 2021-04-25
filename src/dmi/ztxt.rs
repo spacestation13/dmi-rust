@@ -2,7 +2,6 @@ use super::chunk;
 use super::crc;
 use super::error;
 
-
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::prelude::*;
