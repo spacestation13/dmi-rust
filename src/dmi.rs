@@ -65,8 +65,7 @@ impl RawDmi {
 		loop {
 			if index + 12 > dmi_bytes.len() {
 				return Err(error::DmiError::Generic(
-					"Failed to load DMI. Buffer end reached without finding an IEND chunk."
-						.to_string(),
+					"Failed to load DMI. Buffer end reached without finding an IEND chunk.".to_string(),
 				));
 			}
 
@@ -146,7 +145,10 @@ impl RawDmi {
 				let bytes_written = chunk_ztxt.save(&mut writter)?;
 				total_bytes_written += bytes_written;
 				if bytes_written < u32::from_be_bytes(chunk_ztxt.data_length) as usize + 12 {
-					return Err(error::DmiError::Generic(format!("Failed to save DMI. Buffer unable to hold the data, only {} bytes written.", total_bytes_written)));
+					return Err(error::DmiError::Generic(format!(
+						"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
+						total_bytes_written
+					)));
 				};
 			}
 			None => (),
@@ -157,7 +159,10 @@ impl RawDmi {
 				let bytes_written = chunk_plte.save(&mut writter)?;
 				total_bytes_written += bytes_written;
 				if bytes_written < u32::from_be_bytes(chunk_plte.data_length) as usize + 12 {
-					return Err(error::DmiError::Generic(format!("Failed to save DMI. Buffer unable to hold the data, only {} bytes written.", total_bytes_written)));
+					return Err(error::DmiError::Generic(format!(
+						"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
+						total_bytes_written
+					)));
 				};
 			}
 			None => (),
@@ -170,9 +175,9 @@ impl RawDmi {
 					total_bytes_written += bytes_written;
 					if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
 						return Err(error::DmiError::Generic(format!(
-					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-					total_bytes_written
-				)));
+							"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
+							total_bytes_written
+						)));
 					};
 				}
 			}

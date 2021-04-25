@@ -144,7 +144,12 @@ impl Icon {
 				return Err(error::DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
 			};
 			let name = match name.len() {
-				0 | 1 => return Err(error::DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}", name))),
+				0 | 1 => {
+					return Err(error::DmiError::Generic(format!(
+						"Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}",
+						name
+					)))
+				}
 				2 => String::new(), //Only the quotes, empty name otherwise.
 				length @ _ => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
 			};
@@ -194,8 +199,7 @@ impl Icon {
 					"\trewind" => rewind = Some(split_version[1].parse::<u32>()?),
 					"\tmovement" => movement = Some(split_version[1].parse::<u32>()?),
 					"\thotspot" => {
-						let text_coordinates: Vec<&str> =
-							split_version[1].split_terminator(",").collect();
+						let text_coordinates: Vec<&str> = split_version[1].split_terminator(",").collect();
 						if text_coordinates.len() != 3 {
 							return Err(error::DmiError::Generic(format!(
 								"Error loading icon: improper hotspot found: {:#?}",
@@ -212,17 +216,11 @@ impl Icon {
 						unknown_settings = match unknown_settings {
 							None => {
 								let mut new_map = HashMap::new();
-								new_map.insert(
-									split_version[0].to_string(),
-									split_version[1].to_string(),
-								);
+								new_map.insert(split_version[0].to_string(), split_version[1].to_string());
 								Some(new_map)
 							}
 							Some(mut thing) => {
-								thing.insert(
-									split_version[0].to_string(),
-									split_version[1].to_string(),
-								);
+								thing.insert(split_version[0].to_string(), split_version[1].to_string());
 								Some(thing)
 							}
 						};
@@ -231,7 +229,10 @@ impl Icon {
 			}
 
 			if dirs == None || frames == None {
-				return Err(error::DmiError::Generic(format!("Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.", dirs, frames)));
+				return Err(error::DmiError::Generic(format!(
+					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
+					dirs, frames
+				)));
 			};
 			let dirs = dirs.unwrap();
 			let frames = frames.unwrap();

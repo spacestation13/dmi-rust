@@ -63,7 +63,10 @@ impl RawZtxtChunk {
 			raw_chunk_bytes[7],
 		];
 		if chunk_type != ZTXT_TYPE {
-			return Err(error::DmiError::Generic(format!("Failed to load RawZtxtChunk from reader. Chunk type is not zTXt: {:#?}. Should be {:#?}.", chunk_type, ZTXT_TYPE)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load RawZtxtChunk from reader. Chunk type is not zTXt: {:#?}. Should be {:#?}.",
+				chunk_type, ZTXT_TYPE
+			)));
 		}
 		let data_bytes = &raw_chunk_bytes[8..(total_bytes_length - 4)].to_vec();
 		let data = RawZtxtData::load(&mut &**data_bytes)?;
@@ -161,7 +164,10 @@ impl TryFrom<chunk::RawGenericChunk> for RawZtxtChunk {
 		let data_length = raw_generic_chunk.data_length;
 		let chunk_type = raw_generic_chunk.chunk_type;
 		if chunk_type != ZTXT_TYPE {
-			return Err(error::DmiError::Generic(format!("Failed to convert RawGenericChunk into RawZtxtChunk. Wrong type: {:#?}. Expected: {:#?}.", chunk_type, ZTXT_TYPE)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to convert RawGenericChunk into RawZtxtChunk. Wrong type: {:#?}. Expected: {:#?}.",
+				chunk_type, ZTXT_TYPE
+			)));
 		};
 		let chunk_data = &raw_generic_chunk.data;
 		let data = RawZtxtData::load(&mut &**chunk_data)?;
@@ -223,7 +229,12 @@ impl RawZtxtData {
 		let mut data_bytes_iter = data_bytes.iter().cloned();
 		let keyword = data_bytes_iter.by_ref().take_while(|x| *x != 0).collect();
 		let null_separator = 0;
-		let compression_method = data_bytes_iter.next().ok_or_else(|| error::DmiError::Generic(format!("Failed to load RawZtxtData from reader, during compression method reading.\nVector: {:#?}", data_bytes)))?;
+		let compression_method = data_bytes_iter.next().ok_or_else(|| {
+			error::DmiError::Generic(format!(
+				"Failed to load RawZtxtData from reader, during compression method reading.\nVector: {:#?}",
+				data_bytes
+			))
+		})?;
 		//let compressed_text = RawCompressedText::try_from(back_to_vector)?;
 		let compressed_text = data_bytes_iter.collect();
 		//let compressed_text = RawCompressedText::load(&back_to_vector[..])?;

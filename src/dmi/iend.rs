@@ -33,7 +33,8 @@ impl RawIendChunk {
 		if total_bytes_length != default_iend_chunk.length() {
 			return Err(error::DmiError::Generic(format!(
 				"Failed to load RawIendChunk from reader. Size: {}. Expected: {}.",
-				raw_chunk_bytes.len(), default_iend_chunk.length()
+				raw_chunk_bytes.len(),
+				default_iend_chunk.length()
 			)));
 		}
 
@@ -44,7 +45,10 @@ impl RawIendChunk {
 			raw_chunk_bytes[3],
 		];
 		if data_length != default_iend_chunk.data_length {
-			return Err(error::DmiError::Generic(format!("Failed to load RawIendChunk from reader. Lengh field value: {:#?}. Expected: {:#?}.", data_length, default_iend_chunk.data_length)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load RawIendChunk from reader. Lengh field value: {:#?}. Expected: {:#?}.",
+				data_length, default_iend_chunk.data_length
+			)));
 		}
 
 		let chunk_type = [
@@ -54,7 +58,10 @@ impl RawIendChunk {
 			raw_chunk_bytes[7],
 		];
 		if chunk_type != default_iend_chunk.chunk_type {
-			return Err(error::DmiError::Generic(format!("Failed to load RawIendChunk from reader. Chunk type: {:#?}. Expected {:#?}.", chunk_type, default_iend_chunk.chunk_type)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load RawIendChunk from reader. Chunk type: {:#?}. Expected {:#?}.",
+				chunk_type, default_iend_chunk.chunk_type
+			)));
 		}
 
 		let crc = [
@@ -64,7 +71,10 @@ impl RawIendChunk {
 			raw_chunk_bytes[total_bytes_length - 1],
 		];
 		if crc != default_iend_chunk.crc {
-			return Err(error::DmiError::Generic(format!("Failed to load RawIendChunk from reader. CRC: {:#?}. Expected {:#?}.", crc, default_iend_chunk.crc)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to load RawIendChunk from reader. CRC: {:#?}. Expected {:#?}.",
+				crc, default_iend_chunk.crc
+			)));
 		}
 
 		Ok(default_iend_chunk)
@@ -119,13 +129,19 @@ impl TryFrom<chunk::RawGenericChunk> for RawIendChunk {
 	type Error = error::DmiError;
 	fn try_from(raw_generic_chunk: chunk::RawGenericChunk) -> Result<Self, Self::Error> {
 		if raw_generic_chunk.data.len() > 0 {
-			return Err(error::DmiError::Generic(format!("Failed to convert RawGenericChunk into RawIendChunk. Non-empty data field. Chunk: {:#?}.", raw_generic_chunk)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to convert RawGenericChunk into RawIendChunk. Non-empty data field. Chunk: {:#?}.",
+				raw_generic_chunk
+			)));
 		};
 
 		let default_iend_chunk = RawIendChunk::new();
 
 		if raw_generic_chunk.chunk_type != default_iend_chunk.chunk_type {
-			return Err(error::DmiError::Generic(format!("Failed to convert RawGenericChunk into RawIendChunk. Wrong type: {:#?}. Expected: {:#?}.", raw_generic_chunk.chunk_type, default_iend_chunk.chunk_type)));
+			return Err(error::DmiError::Generic(format!(
+				"Failed to convert RawGenericChunk into RawIendChunk. Wrong type: {:#?}. Expected: {:#?}.",
+				raw_generic_chunk.chunk_type, default_iend_chunk.chunk_type
+			)));
 		};
 		if raw_generic_chunk.crc != default_iend_chunk.crc {
 			return Err(error::DmiError::Generic(format!("Failed to convert RawGenericChunk into RawIendChunk. Mismatching CRC: {:#?}. Expected: {:#?}.", raw_generic_chunk.crc, default_iend_chunk.crc)));
