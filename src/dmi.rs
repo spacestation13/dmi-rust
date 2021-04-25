@@ -94,14 +94,10 @@ impl RawDmi {
 			}
 		}
 		if chunk_ihdr == None {
-			return Err(error::DmiError::Generic(format!(
-				"Failed to load DMI. Buffer end reached without finding an IHDR chunk."
-			)));
+			return Err(error::DmiError::Generic("Failed to load DMI. Buffer end reached without finding an IHDR chunk.".to_string()));
 		};
-		if chunks_idat.len() == 0 {
-			return Err(error::DmiError::Generic(format!(
-				"Failed to load DMI. Buffer end reached without finding an IDAT chunk."
-			)));
+		if chunks_idat.is_empty() {
+			return Err(error::DmiError::Generic("Failed to load DMI. Buffer end reached without finding an IDAT chunk.".to_string()));
 		}
 		let other_chunks = match other_chunks.len() {
 			0 => None,

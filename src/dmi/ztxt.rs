@@ -1,8 +1,8 @@
 use super::chunk;
 use super::crc;
 use super::error;
-use deflate;
-use inflate;
+
+
 use std::convert::TryFrom;
 use std::fmt;
 use std::io::prelude::*;

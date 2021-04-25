@@ -128,7 +128,7 @@ impl Default for RawIendChunk {
 impl TryFrom<chunk::RawGenericChunk> for RawIendChunk {
 	type Error = error::DmiError;
 	fn try_from(raw_generic_chunk: chunk::RawGenericChunk) -> Result<Self, Self::Error> {
-		if raw_generic_chunk.data.len() > 0 {
+		if !raw_generic_chunk.data.is_empty() {
 			return Err(error::DmiError::Generic(format!(
 				"Failed to convert RawGenericChunk into RawIendChunk. Non-empty data field. Chunk: {:#?}.",
 				raw_generic_chunk

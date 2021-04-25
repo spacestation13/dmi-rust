@@ -1,7 +1,7 @@
 use super::error;
 use super::ztxt;
 use super::RawDmi;
-use image;
+
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
@@ -21,9 +21,7 @@ impl Icon {
 		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
 			Some(chunk) => chunk.clone(),
 			None => {
-				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no zTXt chunk found."
-				)))
+				return Err(error::DmiError::Generic("Error loading icon: no zTXt chunk found.".to_string()))
 			}
 		};
 		let decompressed_text = chunk_ztxt.data.decode()?;
@@ -41,9 +39,7 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no version header found."
-				)))
+				return Err(error::DmiError::Generic("Error loading icon: no version header found.".to_string()))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -58,9 +54,7 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no width found."
-				)))
+				return Err(error::DmiError::Generic("Error loading icon: no width found.".to_string()))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -75,9 +69,7 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no height found."
-				)))
+				return Err(error::DmiError::Generic("Error loading icon: no height found.".to_string()))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
@@ -118,9 +110,7 @@ impl Icon {
 		let mut current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(format!(
-					"Error loading icon: no DMI trailer nor states found."
-				)))
+				return Err(error::DmiError::Generic("Error loading icon: no DMI trailer nor states found.".to_string()))
 			}
 		};
 
@@ -151,7 +141,7 @@ impl Icon {
 					)))
 				}
 				2 => String::new(), //Only the quotes, empty name otherwise.
-				length @ _ => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
+				length => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
 			};
 
 			let mut dirs = None;
@@ -167,9 +157,7 @@ impl Icon {
 				current_line = match decompressed_text.next() {
 					Some(thing) => thing,
 					None => {
-						return Err(error::DmiError::Generic(format!(
-							"Error loading icon: no DMI trailer found."
-						)))
+						return Err(error::DmiError::Generic("Error loading icon: no DMI trailer found.".to_string()))
 					}
 				};
 
@@ -189,7 +177,7 @@ impl Icon {
 					"\tframes" => frames = Some(split_version[1].parse::<u32>()?),
 					"\tdelay" => {
 						let mut delay_vector = vec![];
-						let text_delays = split_version[1].split_terminator(",");
+						let text_delays = split_version[1].split_terminator(',');
 						for text_entry in text_delays {
 							delay_vector.push(text_entry.parse::<f32>()?);
 						}
@@ -199,7 +187,7 @@ impl Icon {
 					"\trewind" => rewind = Some(split_version[1].parse::<u32>()?),
 					"\tmovement" => movement = Some(split_version[1].parse::<u32>()?),
 					"\thotspot" => {
-						let text_coordinates: Vec<&str> = split_version[1].split_terminator(",").collect();
+						let text_coordinates: Vec<&str> = split_version[1].split_terminator(',').collect();
 						if text_coordinates.len() != 3 {
 							return Err(error::DmiError::Generic(format!(
 								"Error loading icon: improper hotspot found: {:#?}",
@@ -362,7 +350,7 @@ impl Icon {
 
 		new_dmi.chunk_ztxt = Some(new_ztxt);
 
-		Ok(new_dmi.save(&mut writter)?)
+		new_dmi.save(&mut writter)
 	}
 }
 

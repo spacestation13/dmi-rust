@@ -52,7 +52,7 @@ impl RawGenericChunk {
 			)));
 		};
 
-		let data: Vec<u8> = chunk_bytes[8..(chunk_length - 4)].iter().cloned().collect();
+		let data: Vec<u8> = chunk_bytes[8..(chunk_length - 4)].to_vec();
 
 		let crc = [
 			chunk_bytes[chunk_length - 4],
