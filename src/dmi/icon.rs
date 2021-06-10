@@ -397,5 +397,7 @@ impl Default for IconState {
 pub struct DmiVersion(String);
 
 impl Default for DmiVersion {
-	fn default() -> Self {DmiVersion("4.0".to_string())}
+	fn default() -> Self {
+		DmiVersion("4.0".to_string())
+	}
 }
