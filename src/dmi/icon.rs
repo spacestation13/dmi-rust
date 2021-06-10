@@ -9,7 +9,7 @@ use std::io::prelude::*;
 
 #[derive(Clone, Default)]
 pub struct Icon {
-	pub version: String,
+	pub version: DmiVersion,
 	pub width: u32,
 	pub height: u32,
 	pub states: Vec<IconState>,
@@ -268,7 +268,7 @@ impl Icon {
 		}
 
 		Ok(Icon {
-			version,
+			version: DmiVersion(version),
 			width,
 			height,
 			states,
@@ -279,7 +279,7 @@ impl Icon {
 		let mut sprites = vec![];
 		let mut signature = format!(
 			"# BEGIN DMI\nversion = {}\n\twidth = {}\n\theight = {}\n",
-			self.version, self.width, self.height
+			self.version.0, self.width, self.height
 		);
 
 		for icon_state in &self.states {
@@ -391,4 +391,11 @@ impl Default for IconState {
 			unknown_settings: None,
 		}
 	}
+}
+
+#[derive(Clone)]
+pub struct DmiVersion(String);
+
+impl Default for DmiVersion {
+	fn default() -> Self {DmiVersion("4.0".to_string())}
 }
