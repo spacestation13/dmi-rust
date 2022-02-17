@@ -310,7 +310,7 @@ impl Icon {
 					signature.push_str(&format!("\trewind = {}\n", flag))
 				}
 				if let Some(flag) = icon_state.movement {
-					signature.push_str(&format!("\trewind = {}\n", flag))
+					signature.push_str(&format!("\tmovement = {}\n", flag))
 				}
 			};
 
