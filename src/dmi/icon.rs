@@ -5,6 +5,7 @@ use super::RawDmi;
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::io::prelude::*;
 
 #[derive(Clone, Default)]
@@ -339,20 +340,20 @@ impl Icon {
 		let mut new_png =
 			image::DynamicImage::new_rgba8(max_index * self.width, max_index * self.height);
 
-		for image in sprites.iter().enumerate() {
-			let index = image.0 as u32;
-			let image = image.1;
+
+		for (index, image) in sprites.iter().enumerate() {
+			let index = index as u32;
 			imageops::replace(
 				&mut new_png,
 				*image,
-				self.width * (index % max_index),
-				self.height * (index / max_index),
+				(self.width * (index % max_index)) as i64,
+				(self.height * (index / max_index)) as i64,
 			);
 		}
 
-		let mut new_dmi = vec![];
+		let mut new_dmi = Cursor::new(vec![]);
 		new_png.write_to(&mut new_dmi, image::ImageOutputFormat::Png)?;
-		let mut new_dmi = RawDmi::load(&new_dmi[..])?;
+		let mut new_dmi = RawDmi::load(&new_dmi.into_inner()[..])?;
 
 		let new_ztxt = ztxt::create_ztxt_chunk(signature.as_bytes())?;
 
