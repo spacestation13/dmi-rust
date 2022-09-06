@@ -7,6 +7,7 @@ use image::GenericImageView;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::fmt::Write as _;
 
 #[derive(Clone, Default)]
 pub struct Icon {
@@ -288,10 +289,8 @@ impl Icon {
 				return Err(error::DmiError::Generic(format!("Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".", icon_state.images.len(), icon_state.dirs, icon_state.frames, icon_state.name)));
 			};
 
-			signature.push_str(&format!(
-				"state = \"{}\"\n\tdirs = {}\n\tframes = {}\n",
-				icon_state.name, icon_state.dirs, icon_state.frames
-			));
+			let _ = writeln!(signature, "state = \"{}\"\n\tdirs = {}\n\tframes = {}", icon_state.name, icon_state.dirs, icon_state.frames);
+
 
 			if icon_state.frames > 1 {
 				match &icon_state.delay {
@@ -300,32 +299,29 @@ impl Icon {
 							return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({:3?}). Name: \"{}\".", icon_state.frames, delay, icon_state.name)))
 						};
 						let delay: Vec<String>= delay.iter().map(|&c| c.to_string()).collect();
-						signature.push_str(&format!("\tdelay = {}\n", delay.join(",")));
+						let _ = writeln!(signature, "\tdelay = {}", delay.join(","));
 					},
 					None => return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
 				if let Some(flag) = icon_state.loop_flag {
-					signature.push_str(&format!("\tloop = {}\n", flag))
+					let _ = writeln!(signature, "\tloop = {flag}");
 				}
 				if let Some(flag) = icon_state.rewind {
-					signature.push_str(&format!("\trewind = {}\n", flag))
+					let _ = writeln!(signature, "\trewind = {flag}");
 				}
 				if let Some(flag) = icon_state.movement {
-					signature.push_str(&format!("\tmovement = {}\n", flag))
+					let _ = writeln!(signature, "\tmovement = {flag}");
 				}
 			};
 
 			if let Some(array) = icon_state.hotspot {
-				signature.push_str(&format!(
-					"\tarray = {},{},{}\n",
-					array[0], array[1], array[2]
-				))
+				let _ = writeln!(signature, "\tarray = {},{},{}", array[0], array[1], array[2]);
 			};
 
 			match &icon_state.unknown_settings {
 				Some(hashmap) => {
 					for (setting, value) in hashmap.iter() {
-						signature.push_str(&format!("\t{} = {}\n", setting, value));
+						let _ = writeln!(signature, "\t{setting} = {value}");
 					}
 				}
 				None => (),

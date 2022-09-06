@@ -287,15 +287,10 @@ impl RawZtxtData {
 	}
 
 	pub fn decode(&self) -> Result<Vec<u8>, error::DmiError> {
-		match inflate::inflate_bytes_zlib(&self.compressed_text) {
-			Ok(decompressed_text) => Ok(decompressed_text),
-			Err(text) => {
-				return Err(error::DmiError::Generic(format!(
-					"Failed to read compressed text. Error: {}",
-					text
-				)))
-			}
-		}
+		inflate::inflate_bytes_zlib(&self.compressed_text)
+			.map_err(|text| error::DmiError::Generic(format!(
+				"Failed to read compressed text. Error: {text}"
+			)))
 	}
 
 	fn length(&self) -> usize {
