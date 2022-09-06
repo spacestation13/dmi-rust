@@ -5,8 +5,8 @@ use super::RawDmi;
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
-use std::io::Cursor;
 use std::io::prelude::*;
+use std::io::Cursor;
 
 #[derive(Clone, Default)]
 pub struct Icon {
@@ -339,7 +339,6 @@ impl Icon {
 		let max_index = (sprites.len() as f64).sqrt().ceil() as u32;
 		let mut new_png =
 			image::DynamicImage::new_rgba8(max_index * self.width, max_index * self.height);
-
 
 		for (index, image) in sprites.iter().enumerate() {
 			let index = index as u32;
