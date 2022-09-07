@@ -5,9 +5,9 @@ use super::RawDmi;
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::io::prelude::*;
 use std::io::Cursor;
-use std::fmt::Write as _;
 
 #[derive(Clone, Default)]
 pub struct Icon {
@@ -289,8 +289,11 @@ impl Icon {
 				return Err(error::DmiError::Generic(format!("Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".", icon_state.images.len(), icon_state.dirs, icon_state.frames, icon_state.name)));
 			};
 
-			let _ = writeln!(signature, "state = \"{}\"\n\tdirs = {}\n\tframes = {}", icon_state.name, icon_state.dirs, icon_state.frames);
-
+			let _ = writeln!(
+				signature,
+				"state = \"{}\"\n\tdirs = {}\n\tframes = {}",
+				icon_state.name, icon_state.dirs, icon_state.frames
+			);
 
 			if icon_state.frames > 1 {
 				match &icon_state.delay {
@@ -315,7 +318,11 @@ impl Icon {
 			};
 
 			if let Some(array) = icon_state.hotspot {
-				let _ = writeln!(signature, "\tarray = {},{},{}", array[0], array[1], array[2]);
+				let _ = writeln!(
+					signature,
+					"\tarray = {},{},{}",
+					array[0], array[1], array[2]
+				);
 			};
 
 			match &icon_state.unknown_settings {
