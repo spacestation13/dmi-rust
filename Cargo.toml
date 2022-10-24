@@ -1,7 +1,7 @@
 [package]
 name = "dmi"
 version = "0.1.4"
-edition = "2018"
+edition = "2021"
 license = "MIT"
 description = "DMI library written in Rust. Provides helpers to manipulate and produce DMI format files."
 authors = ["Rohesie <rohesie@gmail.com>"]
