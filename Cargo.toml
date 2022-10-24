@@ -1,6 +1,6 @@
 [package]
 name = "dmi"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "DMI library written in Rust. Provides helpers to manipulate and produce DMI format files."
@@ -12,6 +12,6 @@ exclude = ["src/tests.rs", "tests/*"]
 
 [dependencies]
 thiserror = "1.0"
-image = { version = "0.24", features = ["png"] }
+image = { version = "0.24", default-features = false, features = ["png"] }
 deflate = "1.0"
 inflate = "0.4"
