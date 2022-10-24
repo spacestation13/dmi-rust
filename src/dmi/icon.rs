@@ -6,6 +6,7 @@ use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
 use std::io::prelude::*;
+use std::io::Cursor;
 
 #[derive(Clone, Default)]
 pub struct Icon {
@@ -345,14 +346,14 @@ impl Icon {
 			imageops::replace(
 				&mut new_png,
 				*image,
-				self.width * (index % max_index),
-				self.height * (index / max_index),
+				(self.width * (index % max_index)).into(),
+				(self.height * (index / max_index)).into(),
 			);
 		}
 
-		let mut new_dmi = vec![];
-		new_png.write_to(&mut new_dmi, image::ImageOutputFormat::Png)?;
-		let mut new_dmi = RawDmi::load(&new_dmi[..])?;
+		let mut dmi_data = Cursor::new(vec![]);
+		new_png.write_to(&mut dmi_data, image::ImageOutputFormat::Png)?;
+		let mut new_dmi = RawDmi::load(&dmi_data.into_inner()[..])?;
 
 		let new_ztxt = ztxt::create_ztxt_chunk(signature.as_bytes())?;
 

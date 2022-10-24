@@ -12,6 +12,6 @@ exclude = ["src/tests.rs", "tests/*"]
 
 [dependencies]
 thiserror = "1.0"
-image = { version = "0.23", features = ["png"] }
+image = { version = "0.24", features = ["png"] }
 deflate = "1.0"
 inflate = "0.4"
