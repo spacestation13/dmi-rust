@@ -93,7 +93,7 @@ impl RawDmi {
 				_ => other_chunks.push(raw_chunk),
 			}
 		}
-		if chunk_ihdr == None {
+		if chunk_ihdr.is_none() {
 			return Err(error::DmiError::Generic(
 				"Failed to load DMI. Buffer end reached without finding an IHDR chunk.".to_string(),
 			));
