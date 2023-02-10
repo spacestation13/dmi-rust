@@ -229,7 +229,7 @@ impl Icon {
 				};
 			}
 
-			if dirs == None || frames == None {
+			if dirs.is_none() || frames.is_none() {
 				return Err(error::DmiError::Generic(format!(
 					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
 					dirs, frames
