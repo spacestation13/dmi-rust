@@ -1,10 +1,9 @@
+pub mod chunk;
 pub(crate) mod crc;
 pub mod error;
-pub mod chunk;
 pub mod icon;
 pub mod iend;
 pub mod ztxt;
-
 
 use std::io::{Read, Write};
 
@@ -207,5 +206,3 @@ impl RawDmi {
 		Ok(total_bytes_written)
 	}
 }
-
-

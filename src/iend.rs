@@ -1,6 +1,6 @@
+use crate::{chunk, error};
 use std::convert::TryFrom;
 use std::io::prelude::*;
-use crate::{chunk, error};
 
 pub const IEND_TYPE: [u8; 4] = [b'I', b'E', b'N', b'D'];
 

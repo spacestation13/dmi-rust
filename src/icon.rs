@@ -1,9 +1,9 @@
+use crate::{error, ztxt, RawDmi};
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
-use crate::{error, RawDmi, ztxt};
 
 #[derive(Clone, Default)]
 pub struct Icon {
