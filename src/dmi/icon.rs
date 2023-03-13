@@ -437,7 +437,7 @@ impl From<Looping> for Option<NonZeroU32> {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
-pub struct Hotspot(u32, u32);
+pub struct Hotspot(pub u32, pub u32);
 
 #[derive(Clone)]
 pub struct IconState {
