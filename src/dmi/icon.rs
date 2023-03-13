@@ -209,10 +209,10 @@ impl Icon {
 								split_version
 							)));
 						};
-						hotspot = Some(Hotspot(
-							text_coordinates[0].parse::<u32>()?,
-							text_coordinates[1].parse::<u32>()?,
-						));
+						hotspot = Some(Hotspot {
+							x: text_coordinates[0].parse::<u32>()?,
+							y: text_coordinates[1].parse::<u32>()?,
+						});
 					}
 					_ => {
 						unknown_settings = match unknown_settings {
@@ -316,7 +316,7 @@ impl Icon {
 				}
 			};
 
-			if let Some(Hotspot(x, y)) = icon_state.hotspot {
+			if let Some(Hotspot { x, y }) = icon_state.hotspot {
 				signature.push_str(&format!(
 					// Mysterious third parameter here doesn't seem to do anything. Unable to find
 					// any example of it not being 1.
@@ -436,8 +436,17 @@ impl From<Looping> for Option<NonZeroU32> {
 	}
 }
 
+/// Represents a "Hotspot" as used by an [IconState]. A "Hotspot" is a marked pixel on an [IconState]
+/// which is used as the click location when the [IconState] is used as a cursor. The default cursor
+/// places it at the tip, but a crosshair may want to have it centered.
+///
+/// Note that "y" is inverted from standard image axes, bottom left of the sprite is used as 0 and
+/// y increases as you move upwards.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
-pub struct Hotspot(pub u32, pub u32);
+pub struct Hotspot {
+	pub x: u32,
+	pub y: u32,
+}
 
 #[derive(Clone)]
 pub struct IconState {
