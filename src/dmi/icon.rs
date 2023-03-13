@@ -365,6 +365,17 @@ impl Icon {
 	}
 }
 
+/// Represents the Looping flag in an [IconState], which is used to determine how to loop an
+/// animated [IconState]
+///
+/// - `Indefinitely`: Loop repeatedly as long as the [IconState] is displayed
+/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32`
+/// for memory efficiency reasons, looping 0 times is an invalid state.
+///
+/// This type is effectively a newtype of `Option<NonZeroU32>`. As such, `From<Looping>` is
+/// implemented for `Option<NonZeroU32>` as well as `Option<u32>`. If the more advanced combinators
+/// or `?` operator of the native `Option` type are desired, this type can be `into` either
+/// previously mentioned types.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub enum Looping {
 	#[default]
@@ -373,8 +384,55 @@ pub enum Looping {
 }
 
 impl Looping {
+	/// Creates a new `NTimes` variant with `x` number of times to loop
 	pub fn new(x: u32) -> Self {
 		Self::NTimes(NonZeroU32::new(x).unwrap())
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is a `Looping::NTimes`
+	/// # Panics
+	/// Panics if `self` is `Looping::Indefinitely`
+	pub fn unwrap(self) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => panic!("Attempted to unwrap a looping that was"),
+		}
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is an `NTimes`
+	/// If the `Looping` is an `Indefinitely`, yields `u32::default()` which is 0
+	pub fn unwrap_or_default(self) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => u32::default(), // 0
+		}
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is an `NTimes`
+	/// If the `Looping` is an `Indefinitely`, yields the value provided as `default`
+	pub fn unwrap_or(self, default: u32) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => default,
+		}
+	}
+}
+
+impl From<Looping> for Option<u32> {
+	fn from(value: Looping) -> Self {
+		match value {
+			Looping::Indefinitely => None,
+			Looping::NTimes(backing) => Some(backing.get()),
+		}
+	}
+}
+
+impl From<Looping> for Option<NonZeroU32> {
+	fn from(value: Looping) -> Self {
+		match value {
+			Looping::Indefinitely => None,
+			Looping::NTimes(backing) => Some(backing),
+		}
 	}
 }
 
