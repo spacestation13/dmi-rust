@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Debug)]
 pub struct Icon {
 	pub version: DmiVersion,
 	pub width: u32,
@@ -363,7 +363,7 @@ impl Icon {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct IconState {
 	pub name: String,
 	pub dirs: u8,
@@ -394,7 +394,7 @@ impl Default for IconState {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DmiVersion(String);
 
 impl Default for DmiVersion {
