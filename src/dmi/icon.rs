@@ -9,7 +9,7 @@ use std::io::prelude::*;
 use std::io::Cursor;
 use std::num::NonZeroU32;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Debug)]
 pub struct Icon {
 	pub version: DmiVersion,
 	pub width: u32,
@@ -448,7 +448,7 @@ pub struct Hotspot {
 	pub y: u32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct IconState {
 	pub name: String,
 	pub dirs: u8,
@@ -479,7 +479,7 @@ impl Default for IconState {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DmiVersion(String);
 
 impl Default for DmiVersion {
