@@ -395,7 +395,7 @@ impl Looping {
 	pub fn unwrap(self) -> u32 {
 		match self {
 			Self::NTimes(times) => times.get(),
-			_ => panic!("Attempted to unwrap a looping that was"),
+			_ => panic!("Attempted to unwrap a looping that was indefinite"),
 		}
 	}
 
