@@ -1,6 +1,4 @@
-use super::chunk;
-use super::crc;
-use super::error;
+use crate::{chunk, crc, error};
 
 use std::convert::TryFrom;
 use std::fmt;

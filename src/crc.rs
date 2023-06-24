@@ -1,4 +1,4 @@
-pub fn calculate_crc<'a, I: IntoIterator<Item = &'a u8>>(buffer: I) -> u32 {
+pub(crate) fn calculate_crc<'a, I: IntoIterator<Item = &'a u8>>(buffer: I) -> u32 {
 	const CRC_POLYNOMIAL: u32 = 0xedb8_8320;
 
 	fn update_crc(crc: u32, message: u8) -> u32 {

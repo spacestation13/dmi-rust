@@ -1,7 +1,4 @@
-use super::error;
-use super::ztxt;
-use super::RawDmi;
-
+use crate::{error, ztxt, RawDmi};
 use image::imageops;
 use image::GenericImageView;
 use std::collections::HashMap;

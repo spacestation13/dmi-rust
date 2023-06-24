@@ -1,5 +1,4 @@
-use super::chunk;
-use super::error;
+use crate::{chunk, error};
 use std::convert::TryFrom;
 use std::io::prelude::*;
 

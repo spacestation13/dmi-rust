@@ -1,5 +1,4 @@
-use super::crc;
-use super::error;
+use crate::{crc, error};
 use std::io::prelude::*;
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
