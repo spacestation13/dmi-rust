@@ -4,8 +4,9 @@ use image::GenericImageView;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::num::NonZeroU32;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Debug)]
 pub struct Icon {
 	pub version: DmiVersion,
 	pub width: u32,
@@ -155,9 +156,9 @@ impl Icon {
 			let mut dirs = None;
 			let mut frames = None;
 			let mut delay = None;
-			let mut loop_flag = None;
-			let mut rewind = None;
-			let mut movement = None;
+			let mut loop_flag = Looping::Indefinitely;
+			let mut rewind = false;
+			let mut movement = false;
 			let mut hotspot = None;
 			let mut unknown_settings = None;
 
@@ -193,22 +194,22 @@ impl Icon {
 						}
 						delay = Some(delay_vector);
 					}
-					"\tloop" => loop_flag = Some(split_version[1].parse::<u32>()?),
-					"\trewind" => rewind = Some(split_version[1].parse::<u32>()?),
-					"\tmovement" => movement = Some(split_version[1].parse::<u32>()?),
+					"\tloop" => loop_flag = Looping::new(split_version[1].parse::<u32>()?),
+					"\trewind" => rewind = split_version[1].parse::<u8>()? != 0,
+					"\tmovement" => movement = split_version[1].parse::<u8>()? != 0,
 					"\thotspot" => {
 						let text_coordinates: Vec<&str> = split_version[1].split_terminator(',').collect();
+						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
 						if text_coordinates.len() != 3 {
 							return Err(error::DmiError::Generic(format!(
 								"Error loading icon: improper hotspot found: {:#?}",
 								split_version
 							)));
 						};
-						hotspot = Some([
-							text_coordinates[0].parse::<u32>()?,
-							text_coordinates[1].parse::<u32>()?,
-							text_coordinates[2].parse::<u32>()?,
-						]);
+						hotspot = Some(Hotspot {
+							x: text_coordinates[0].parse::<u32>()?,
+							y: text_coordinates[1].parse::<u32>()?,
+						});
 					}
 					_ => {
 						unknown_settings = match unknown_settings {
@@ -301,21 +302,22 @@ impl Icon {
 					},
 					None => return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
-				if let Some(flag) = icon_state.loop_flag {
+				if let Looping::NTimes(flag) = icon_state.loop_flag {
 					signature.push_str(&format!("\tloop = {}\n", flag))
 				}
-				if let Some(flag) = icon_state.rewind {
-					signature.push_str(&format!("\trewind = {}\n", flag))
+				if icon_state.rewind {
+					signature.push_str("\trewind = 1\n");
 				}
-				if let Some(flag) = icon_state.movement {
-					signature.push_str(&format!("\tmovement = {}\n", flag))
+				if icon_state.movement {
+					signature.push_str("\tmovement = 1\n");
 				}
 			};
 
-			if let Some(array) = icon_state.hotspot {
+			if let Some(Hotspot { x, y }) = icon_state.hotspot {
 				signature.push_str(&format!(
-					"\tarray = {},{},{}\n",
-					array[0], array[1], array[2]
+					// Mysterious third parameter here doesn't seem to do anything. Unable to find
+					// any example of it not being 1.
+					"\thotspot = {x},{y},1\n"
 				))
 			};
 
@@ -360,17 +362,100 @@ impl Icon {
 	}
 }
 
-#[derive(Clone)]
+/// Represents the Looping flag in an [IconState], which is used to determine how to loop an
+/// animated [IconState]
+///
+/// - `Indefinitely`: Loop repeatedly as long as the [IconState] is displayed
+/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32`
+/// for memory efficiency reasons, looping 0 times is an invalid state.
+///
+/// This type is effectively a newtype of `Option<NonZeroU32>`. As such, `From<Looping>` is
+/// implemented for `Option<NonZeroU32>` as well as `Option<u32>`. If the more advanced combinators
+/// or `?` operator of the native `Option` type are desired, this type can be `into` either
+/// previously mentioned types.
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+pub enum Looping {
+	#[default]
+	Indefinitely,
+	NTimes(NonZeroU32),
+}
+
+impl Looping {
+	/// Creates a new `NTimes` variant with `x` number of times to loop
+	pub fn new(x: u32) -> Self {
+		Self::NTimes(NonZeroU32::new(x).unwrap())
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is a `Looping::NTimes`
+	/// # Panics
+	/// Panics if `self` is `Looping::Indefinitely`
+	pub fn unwrap(self) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => panic!("Attempted to unwrap a looping that was indefinite"),
+		}
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is an `NTimes`
+	/// If the `Looping` is an `Indefinitely`, yields `u32::default()` which is 0
+	pub fn unwrap_or_default(self) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => u32::default(), // 0
+		}
+	}
+
+	/// Unwraps the Looping yielding the `u32` if the `Looping` is an `NTimes`
+	/// If the `Looping` is an `Indefinitely`, yields the value provided as `default`
+	pub fn unwrap_or(self, default: u32) -> u32 {
+		match self {
+			Self::NTimes(times) => times.get(),
+			_ => default,
+		}
+	}
+}
+
+impl From<Looping> for Option<u32> {
+	fn from(value: Looping) -> Self {
+		match value {
+			Looping::Indefinitely => None,
+			Looping::NTimes(backing) => Some(backing.get()),
+		}
+	}
+}
+
+impl From<Looping> for Option<NonZeroU32> {
+	fn from(value: Looping) -> Self {
+		match value {
+			Looping::Indefinitely => None,
+			Looping::NTimes(backing) => Some(backing),
+		}
+	}
+}
+
+/// Represents a "Hotspot" as used by an [IconState]. A "Hotspot" is a marked pixel on an [IconState]
+/// which is used as the click location when the [IconState] is used as a cursor. The default cursor
+/// places it at the tip, but a crosshair may want to have it centered.
+///
+/// Note that "y" is inverted from standard image axes, bottom left of the sprite is used as 0 and
+/// y increases as you move upwards.
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
+pub struct Hotspot {
+	pub x: u32,
+	pub y: u32,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct IconState {
 	pub name: String,
 	pub dirs: u8,
 	pub frames: u32,
 	pub images: Vec<image::DynamicImage>,
 	pub delay: Option<Vec<f32>>,
-	pub loop_flag: Option<u32>,
-	pub rewind: Option<u32>,
-	pub movement: Option<u32>,
-	pub hotspot: Option<[u32; 3]>,
+	pub loop_flag: Looping,
+	pub rewind: bool,
+	pub movement: bool,
+	pub hotspot: Option<Hotspot>,
 	pub unknown_settings: Option<HashMap<String, String>>,
 }
 
@@ -382,16 +467,16 @@ impl Default for IconState {
 			frames: 1,
 			images: vec![],
 			delay: None,
-			loop_flag: None,
-			rewind: None,
-			movement: None,
+			loop_flag: Looping::Indefinitely,
+			rewind: false,
+			movement: false,
 			hotspot: None,
 			unknown_settings: None,
 		}
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DmiVersion(String);
 
 impl Default for DmiVersion {
