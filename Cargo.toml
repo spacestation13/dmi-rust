@@ -1,11 +1,11 @@
 [package]
 name = "dmi"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "DMI library written in Rust. Provides helpers to manipulate and produce DMI format files."
 authors = ["Rohesie <rohesie@gmail.com>"]
-keywords = ["byond", "dreammaker", "dmi", "spacestation13"]
+keywords = ["byond", "dreammaker", "dmi", "ss13", "spacestation13"]
 homepage = "https://github.com/spacestation13/dmi"
 exclude = ["src/tests.rs", "tests/*"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
