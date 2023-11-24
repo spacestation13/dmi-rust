@@ -363,7 +363,7 @@ impl Icon {
 		let color = new_png.color();
 		let encoder = png::PngEncoder::new_with_quality(
 			&mut dmi_data,
-			png::CompressionType::Best,
+			png::CompressionType::Default,
 			png::FilterType::Adaptive,
 		);
 		encoder.write_image(bytes, width, height, color)?;
