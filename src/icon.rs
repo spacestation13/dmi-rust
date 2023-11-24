@@ -361,7 +361,11 @@ impl Icon {
 		let bytes = new_png.as_bytes();
 		let (width, height) = new_png.dimensions();
 		let color = new_png.color();
-		let encoder = png::PngEncoder::new_with_quality(&mut dmi_data, png::CompressionType::Best, png::FilterType::Adaptive);
+		let encoder = png::PngEncoder::new_with_quality(
+			&mut dmi_data,
+			png::CompressionType::Best,
+			png::FilterType::Adaptive,
+		);
 		encoder.write_image(bytes, width, height, color)?;
 		let mut new_dmi = RawDmi::load(&dmi_data.into_inner()[..])?;
 
