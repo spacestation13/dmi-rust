@@ -1,6 +1,8 @@
 use crate::{error, ztxt, RawDmi};
+use image::codecs::png;
 use image::imageops;
 use image::GenericImageView;
+use image::ImageEncoder;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -335,9 +337,13 @@ impl Icon {
 
 		signature.push_str("# END DMI\n");
 
-		let max_index = (sprites.len() as f64).sqrt().ceil() as u32;
+		// We try to make a square png as output
+		let states_rooted = (sprites.len() as f64).sqrt().ceil();
+		// Then if it turns out we would have empty rows, we remove them
+		let cell_width = states_rooted as u32;
+		let cell_height = ((sprites.len() as f64) / states_rooted).ceil() as u32;
 		let mut new_png =
-			image::DynamicImage::new_rgba8(max_index * self.width, max_index * self.height);
+			image::DynamicImage::new_rgba8(cell_width * self.width, cell_height * self.height);
 
 		for image in sprites.iter().enumerate() {
 			let index = image.0 as u32;
@@ -345,13 +351,22 @@ impl Icon {
 			imageops::replace(
 				&mut new_png,
 				*image,
-				(self.width * (index % max_index)).into(),
-				(self.height * (index / max_index)).into(),
+				(self.width * (index % cell_width)).into(),
+				(self.height * (index / cell_width)).into(),
 			);
 		}
 
 		let mut dmi_data = Cursor::new(vec![]);
-		new_png.write_to(&mut dmi_data, image::ImageOutputFormat::Png)?;
+		// We're futzing around with pngs directly here so we can use the best possible compression
+		let bytes = new_png.as_bytes();
+		let (width, height) = new_png.dimensions();
+		let color = new_png.color();
+		let encoder = png::PngEncoder::new_with_quality(
+			&mut dmi_data,
+			png::CompressionType::Default,
+			png::FilterType::Adaptive,
+		);
+		encoder.write_image(bytes, width, height, color)?;
 		let mut new_dmi = RawDmi::load(&dmi_data.into_inner()[..])?;
 
 		let new_ztxt = ztxt::create_ztxt_chunk(signature.as_bytes())?;
