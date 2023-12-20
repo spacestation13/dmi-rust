@@ -2,7 +2,6 @@ use crate::{error, ztxt, RawDmi};
 use image::codecs::png;
 use image::imageops;
 use image::GenericImageView;
-use image::ImageEncoder;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -357,16 +356,13 @@ impl Icon {
 		}
 
 		let mut dmi_data = Cursor::new(vec![]);
-		// We're futzing around with pngs directly here so we can use the best possible compression
-		let bytes = new_png.as_bytes();
-		let (width, height) = new_png.dimensions();
-		let color = new_png.color();
+		// Use the 'Default' compression - the actual default for the library is 'Fast'
 		let encoder = png::PngEncoder::new_with_quality(
 			&mut dmi_data,
 			png::CompressionType::Default,
 			png::FilterType::Adaptive,
 		);
-		encoder.write_image(bytes, width, height, color)?;
+		new_png.write_with_encoder(encoder)?;
 		let mut new_dmi = RawDmi::load(&dmi_data.into_inner()[..])?;
 
 		let new_ztxt = ztxt::create_ztxt_chunk(signature.as_bytes())?;
