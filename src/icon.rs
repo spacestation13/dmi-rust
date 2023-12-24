@@ -1,3 +1,4 @@
+use crate::dirs::Dirs;
 use crate::{error, ztxt, RawDmi};
 use image::codecs::png;
 use image::imageops;
@@ -8,12 +9,25 @@ use std::io::Cursor;
 use std::num::NonZeroU32;
 
 #[derive(Clone, Default, PartialEq, Debug)]
+/// A DMI Icon, which is a collection of [IconState]s.
 pub struct Icon {
 	pub version: DmiVersion,
 	pub width: u32,
 	pub height: u32,
 	pub states: Vec<IconState>,
 }
+
+/// The ordering of directions within a DMI file.
+pub const DIR_ORDERING: [Dirs; 8] = [
+	Dirs::SOUTH,
+	Dirs::NORTH,
+	Dirs::EAST,
+	Dirs::WEST,
+	Dirs::SOUTHEAST,
+	Dirs::SOUTHWEST,
+	Dirs::NORTHEAST,
+	Dirs::NORTHWEST,
+];
 
 impl Icon {
 	pub fn load<R: Read>(reader: R) -> Result<Icon, error::DmiError> {
