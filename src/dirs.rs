@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 
 bitflags! {
+	/// The possible values for a direction in DM.
 	pub struct Dirs: u8 {
 		const NORTH =	1 << 0;
 		const SOUTH =	1 << 1;
