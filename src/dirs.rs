@@ -2,10 +2,10 @@ use bitflags::bitflags;
 
 bitflags! {
 	pub struct Dirs: u8 {
-		const NORTH =	1 << 1;
-		const SOUTH =	1 << 2;
-		const EAST =	1 << 3;
-		const WEST =	1 << 4;
+		const NORTH =	1 << 0;
+		const SOUTH =	1 << 1;
+		const EAST =	1 << 2;
+		const WEST =	1 << 3;
 		const SOUTHEAST = Self::SOUTH.bits() | Self::EAST.bits();
 		const SOUTHWEST = Self::SOUTH.bits() | Self::WEST.bits();
 		const NORTHEAST = Self::NORTH.bits() | Self::EAST.bits();
