@@ -1,8 +1,8 @@
-use crate::dirs::Dirs;
+use crate::dirs::{Dirs, ALL_DIRS, ORDINAL_DIRS};
 use crate::{error, ztxt, RawDmi};
 use image::codecs::png;
-use image::imageops;
 use image::GenericImageView;
+use image::{imageops, DynamicImage};
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -28,6 +28,21 @@ pub const DIR_ORDERING: [Dirs; 8] = [
 	Dirs::NORTHEAST,
 	Dirs::NORTHWEST,
 ];
+
+/// Given a Dir, gives its order with a DMI file (equivalent: DIR_ORDERING.iter().position(Dir))
+pub fn dir_to_dmi_index(dir: &Dirs) -> Option<u32> {
+	match *dir {
+		Dirs::SOUTH => Some(0),
+		Dirs::NORTH => Some(1),
+		Dirs::EAST => Some(2),
+		Dirs::WEST => Some(3),
+		Dirs::SOUTHEAST => Some(4),
+		Dirs::SOUTHWEST => Some(5),
+		Dirs::NORTHEAST => Some(6),
+		Dirs::NORTHWEST => Some(7),
+		_ => None,
+	}
+}
 
 impl Icon {
 	pub fn load<R: Read>(reader: R) -> Result<Icon, error::DmiError> {
@@ -482,6 +497,49 @@ pub struct IconState {
 	pub movement: bool,
 	pub hotspot: Option<Hotspot>,
 	pub unknown_settings: Option<HashMap<String, String>>,
+}
+
+impl IconState {
+	/// Gets a specific DynamicImage from `images`, given a dir and frame.
+	pub fn get_image(&self, dir: &Dirs, frame: u32) -> Result<&DynamicImage, error::DmiError> {
+		if self.frames < frame {
+			return Err(error::DmiError::IconState(format!(
+				"Specified frame \"{}\" is larger than the number of frames ({}) in icon_state \"{}\"",
+				frame, self.frames, self.name
+			)));
+		}
+		if (self.dirs == 1 && *dir != Dirs::SOUTH)
+			|| (self.dirs == 4 && !ORDINAL_DIRS.contains(dir))
+			|| (self.dirs == 8 && !ALL_DIRS.contains(dir))
+		{
+			return Err(error::DmiError::IconState(format!(
+				"Dir specified {} is not in the set of valid dirs ({} dirs) in icon_state \"{}\"",
+				dir, self.dirs, self.name
+			)));
+		}
+
+		let image_idx = match dir_to_dmi_index(dir) {
+			Some(idx) => (idx + 1) * frame - 1,
+			None => {
+				return Err(error::DmiError::IconState(format!(
+					"Dir specified {} is not a valid dir within DMI ordering! (icon_state: {})",
+					dir, self.name
+				)));
+			}
+		};
+
+		match self.images.get(image_idx as usize) {
+        Some(image) => {
+					Ok(image)
+				},
+        None => {
+          Err(error::DmiError::IconState(format!(
+							"Out of bounds index {} in icon_state \"{}\" (images len: {} dirs: {}, frames: {} - dir: {}, frame: {})",
+							image_idx, self.name, self.images.len(), self.dirs, self.frames, dir, frame
+					)))
+        }
+    }
+	}
 }
 
 impl Default for IconState {
