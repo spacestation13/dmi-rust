@@ -1,5 +1,6 @@
 pub mod chunk;
 pub(crate) mod crc;
+pub mod dirs;
 pub mod error;
 pub mod icon;
 pub mod iend;

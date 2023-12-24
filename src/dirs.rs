@@ -1,0 +1,37 @@
+use bitflags::bitflags;
+
+bitflags! {
+	pub struct Dirs: u8 {
+		const NORTH =	1 << 1;
+		const SOUTH =	1 << 2;
+		const EAST =	1 << 3;
+		const WEST =	1 << 4;
+		const SOUTHEAST = Self::SOUTH.bits() | Self::EAST.bits();
+		const SOUTHWEST = Self::SOUTH.bits() | Self::WEST.bits();
+		const NORTHEAST = Self::NORTH.bits() | Self::EAST.bits();
+		const NORTHWEST = Self::NORTH.bits() | Self::WEST.bits();
+	}
+}
+
+/// A list of every cardinal direction.
+pub const CARDINAL_DIRS: [Dirs; 4] = [Dirs::NORTH, Dirs::SOUTH, Dirs::EAST, Dirs::WEST];
+
+/// A list of every ordinal direction.
+pub const ORDINAL_DIRS: [Dirs; 4] = [
+	Dirs::NORTHEAST,
+	Dirs::NORTHWEST,
+	Dirs::SOUTHEAST,
+	Dirs::SOUTHWEST,
+];
+
+/// A list of every direction, cardinals and ordinals.
+pub const ALL_DIRS: [Dirs; 8] = [
+	Dirs::NORTH,
+	Dirs::SOUTH,
+	Dirs::EAST,
+	Dirs::WEST,
+	Dirs::NORTHEAST,
+	Dirs::NORTHWEST,
+	Dirs::SOUTHEAST,
+	Dirs::SOUTHWEST,
+];
