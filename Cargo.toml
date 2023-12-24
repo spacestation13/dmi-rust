@@ -1,6 +1,6 @@
 [package]
 name = "dmi"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "MIT"
 description = "DMI library written in Rust. Provides helpers to manipulate and produce DMI format files."
