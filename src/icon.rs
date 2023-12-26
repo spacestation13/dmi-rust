@@ -509,6 +509,7 @@ impl IconState {
 				self.frames, self.name
 			)));
 		}
+
 		if (self.dirs == 1 && *dir != Dirs::SOUTH)
 			|| (self.dirs == 4 && !CARDINAL_DIRS.contains(dir))
 			|| (self.dirs == 8 && !ALL_DIRS.contains(dir))
@@ -532,16 +533,16 @@ impl IconState {
 		match self.images.get(image_idx) {
 			Some(image) => Ok(image),
 			None => Err(DmiError::IconState(format!(
-				"Out of bounds index {image_idx} in icon_state \"{}\" (images len: {} dirs: {}, frames: {} - dir: {}, frame: {})",
-				self.name, self.images.len(), self.dirs, self.frames, dir, frame
+				"Out of bounds index {image_idx} in icon_state \"{}\" (images len: {} dirs: {}, frames: {} - dir: {dir}, frame: {frame})",
+				self.name, self.images.len(), self.dirs, self.frames
 			))),
-    	}
+		}
 	}
 }
 
 impl Default for IconState {
 	fn default() -> Self {
-		IconState {
+		Self {
 			name: String::new(),
 			dirs: 1,
 			frames: 1,
