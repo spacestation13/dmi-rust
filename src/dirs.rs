@@ -15,6 +15,12 @@ bitflags! {
 	}
 }
 
+impl std::fmt::Display for Dirs {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "{} ({:?})", self.bits(), self)
+	}
+}
+
 /// A list of every cardinal direction.
 pub const CARDINAL_DIRS: [Dirs; 4] = [Dirs::NORTH, Dirs::SOUTH, Dirs::EAST, Dirs::WEST];
 

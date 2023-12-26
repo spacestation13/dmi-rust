@@ -1,8 +1,8 @@
-use crate::dirs::Dirs;
-use crate::{error, ztxt, RawDmi};
+use crate::dirs::{Dirs, ALL_DIRS, CARDINAL_DIRS};
+use crate::{error::DmiError, ztxt, RawDmi};
 use image::codecs::png;
-use image::imageops;
 use image::GenericImageView;
+use image::{imageops, DynamicImage};
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -29,13 +29,28 @@ pub const DIR_ORDERING: [Dirs; 8] = [
 	Dirs::NORTHWEST,
 ];
 
+/// Given a Dir, gives its order within a DMI file (equivalent: DIR_ORDERING.iter().position(|d| d == dir))
+pub fn dir_to_dmi_index(dir: &Dirs) -> Option<usize> {
+	match *dir {
+		Dirs::SOUTH => Some(0),
+		Dirs::NORTH => Some(1),
+		Dirs::EAST => Some(2),
+		Dirs::WEST => Some(3),
+		Dirs::SOUTHEAST => Some(4),
+		Dirs::SOUTHWEST => Some(5),
+		Dirs::NORTHEAST => Some(6),
+		Dirs::NORTHWEST => Some(7),
+		_ => None,
+	}
+}
+
 impl Icon {
-	pub fn load<R: Read>(reader: R) -> Result<Icon, error::DmiError> {
+	pub fn load<R: Read>(reader: R) -> Result<Icon, DmiError> {
 		let raw_dmi = RawDmi::load(reader)?;
 		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
 			Some(chunk) => chunk.clone(),
 			None => {
-				return Err(error::DmiError::Generic(
+				return Err(DmiError::Generic(
 					"Error loading icon: no zTXt chunk found.".to_string(),
 				))
 			}
@@ -46,7 +61,7 @@ impl Icon {
 
 		let current_line = decompressed_text.next();
 		if current_line != Some("# BEGIN DMI") {
-			return Err(error::DmiError::Generic(format!(
+			return Err(DmiError::Generic(format!(
 				"Error loading icon: no DMI header found. Beginning: {:#?}",
 				current_line
 			)));
@@ -55,14 +70,14 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(
+				return Err(DmiError::Generic(
 					"Error loading icon: no version header found.".to_string(),
 				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "version" {
-			return Err(error::DmiError::Generic(format!(
+			return Err(DmiError::Generic(format!(
 				"Error loading icon: improper version header found: {:#?}",
 				split_version
 			)));
@@ -72,14 +87,14 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(
+				return Err(DmiError::Generic(
 					"Error loading icon: no width found.".to_string(),
 				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\twidth" {
-			return Err(error::DmiError::Generic(format!(
+			return Err(DmiError::Generic(format!(
 				"Error loading icon: improper width found: {:#?}",
 				split_version
 			)));
@@ -89,14 +104,14 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(
+				return Err(DmiError::Generic(
 					"Error loading icon: no height found.".to_string(),
 				))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\theight" {
-			return Err(error::DmiError::Generic(format!(
+			return Err(DmiError::Generic(format!(
 				"Error loading icon: improper height found: {:#?}",
 				split_version
 			)));
@@ -104,7 +119,7 @@ impl Icon {
 		let height = split_version[1].parse::<u32>()?;
 
 		if width == 0 || height == 0 {
-			return Err(error::DmiError::Generic(format!(
+			return Err(DmiError::Generic(format!(
 				"Error loading icon: invalid width ({}) / height ({}) values.",
 				width, height
 			)));
@@ -120,7 +135,7 @@ impl Icon {
 		let img_height = dimensions.1;
 
 		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
-			return Err(error::DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
+			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
 		};
 
 		let width_in_states = img_width / width;
@@ -132,7 +147,7 @@ impl Icon {
 		let mut current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(error::DmiError::Generic(
+				return Err(DmiError::Generic(
 					"Error loading icon: no DMI trailer nor states found.".to_string(),
 				))
 			}
@@ -147,7 +162,7 @@ impl Icon {
 
 			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 			if split_version.len() != 2 || split_version[0] != "state" {
-				return Err(error::DmiError::Generic(format!(
+				return Err(DmiError::Generic(format!(
 					"Error loading icon: improper state found: {:#?}",
 					split_version
 				)));
@@ -155,11 +170,11 @@ impl Icon {
 
 			let name = split_version[1].as_bytes();
 			if !name.starts_with(&[b'\"']) || !name.ends_with(&[b'\"']) {
-				return Err(error::DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
+				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
 			};
 			let name = match name.len() {
 				0 | 1 => {
-					return Err(error::DmiError::Generic(format!(
+					return Err(DmiError::Generic(format!(
 						"Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}",
 						name
 					)))
@@ -181,7 +196,7 @@ impl Icon {
 				current_line = match decompressed_text.next() {
 					Some(thing) => thing,
 					None => {
-						return Err(error::DmiError::Generic(
+						return Err(DmiError::Generic(
 							"Error loading icon: no DMI trailer found.".to_string(),
 						))
 					}
@@ -192,7 +207,7 @@ impl Icon {
 				};
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 				if split_version.len() != 2 {
-					return Err(error::DmiError::Generic(format!(
+					return Err(DmiError::Generic(format!(
 						"Error loading icon: improper state found: {:#?}",
 						split_version
 					)));
@@ -216,7 +231,7 @@ impl Icon {
 						let text_coordinates: Vec<&str> = split_version[1].split_terminator(',').collect();
 						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
 						if text_coordinates.len() != 3 {
-							return Err(error::DmiError::Generic(format!(
+							return Err(DmiError::Generic(format!(
 								"Error loading icon: improper hotspot found: {:#?}",
 								split_version
 							)));
@@ -243,7 +258,7 @@ impl Icon {
 			}
 
 			if dirs.is_none() || frames.is_none() {
-				return Err(error::DmiError::Generic(format!(
+				return Err(DmiError::Generic(format!(
 					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
 					dirs, frames
 				)));
@@ -252,7 +267,7 @@ impl Icon {
 			let frames = frames.unwrap();
 
 			if index + (dirs as u32 * frames) > max_possible_states {
-				return Err(error::DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({}).", max_possible_states)));
+				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({}).", max_possible_states)));
 			};
 
 			let mut images = vec![];
@@ -289,7 +304,7 @@ impl Icon {
 		})
 	}
 
-	pub fn save<W: Write>(&self, mut writter: &mut W) -> Result<usize, error::DmiError> {
+	pub fn save<W: Write>(&self, mut writter: &mut W) -> Result<usize, DmiError> {
 		let mut sprites = vec![];
 		let mut signature = format!(
 			"# BEGIN DMI\nversion = {}\n\twidth = {}\n\theight = {}\n",
@@ -298,7 +313,7 @@ impl Icon {
 
 		for icon_state in &self.states {
 			if icon_state.images.len() as u32 != icon_state.dirs as u32 * icon_state.frames {
-				return Err(error::DmiError::Generic(format!("Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".", icon_state.images.len(), icon_state.dirs, icon_state.frames, icon_state.name)));
+				return Err(DmiError::Generic(format!("Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".", icon_state.images.len(), icon_state.dirs, icon_state.frames, icon_state.name)));
 			};
 
 			signature.push_str(&format!(
@@ -310,12 +325,12 @@ impl Icon {
 				match &icon_state.delay {
 					Some(delay) => {
 						if delay.len() as u32 != icon_state.frames {
-							return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({:3?}). Name: \"{}\".", icon_state.frames, delay, icon_state.name)))
+							return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({:3?}). Name: \"{}\".", icon_state.frames, delay, icon_state.name)))
 						};
 						let delay: Vec<String>= delay.iter().map(|&c| c.to_string()).collect();
 						signature.push_str(&format!("\tdelay = {}\n", delay.join(",")));
 					},
-					None => return Err(error::DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
+					None => return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
 				if let Looping::NTimes(flag) = icon_state.loop_flag {
 					signature.push_str(&format!("\tloop = {}\n", flag))
@@ -484,9 +499,50 @@ pub struct IconState {
 	pub unknown_settings: Option<HashMap<String, String>>,
 }
 
+impl IconState {
+	/// Gets a specific DynamicImage from `images`, given a dir and frame.
+	/// If the dir or frame is invalid, returns a DmiError.
+	pub fn get_image(&self, dir: &Dirs, frame: u32) -> Result<&DynamicImage, DmiError> {
+		if self.frames < frame {
+			return Err(DmiError::IconState(format!(
+				"Specified frame \"{frame}\" is larger than the number of frames ({}) for icon_state \"{}\"",
+				self.frames, self.name
+			)));
+		}
+
+		if (self.dirs == 1 && *dir != Dirs::SOUTH)
+			|| (self.dirs == 4 && !CARDINAL_DIRS.contains(dir))
+			|| (self.dirs == 8 && !ALL_DIRS.contains(dir))
+		{
+			return Err(DmiError::IconState(format!(
+				"Dir specified {dir} is not in the set of valid dirs ({} dirs) for icon_state \"{}\"",
+				self.dirs, self.name
+			)));
+		}
+
+		let image_idx = match dir_to_dmi_index(dir) {
+			Some(idx) => (idx + 1) * frame as usize - 1,
+			None => {
+				return Err(DmiError::IconState(format!(
+					"Dir specified {dir} is not a valid dir within DMI ordering! (icon_state: {})",
+					self.name
+				)));
+			}
+		};
+
+		match self.images.get(image_idx) {
+			Some(image) => Ok(image),
+			None => Err(DmiError::IconState(format!(
+				"Out of bounds index {image_idx} in icon_state \"{}\" (images len: {} dirs: {}, frames: {} - dir: {dir}, frame: {frame})",
+				self.name, self.images.len(), self.dirs, self.frames
+			))),
+		}
+	}
+}
+
 impl Default for IconState {
 	fn default() -> Self {
-		IconState {
+		Self {
 			name: String::new(),
 			dirs: 1,
 			frames: 1,
