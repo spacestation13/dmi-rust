@@ -11,8 +11,8 @@ exclude = ["src/tests.rs", "tests/*"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "2.4.1"
+bitflags = "2.5.0"
 deflate = "1.0"
-image = { version = "0.24.7", default-features = false, features = ["png"] }
+image = { version = "0.25.1", default-features = false, features = ["png"] }
 inflate = "0.4.5"
 thiserror = "1.0"
