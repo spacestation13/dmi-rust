@@ -352,10 +352,10 @@ impl Icon {
 			};
 
 			if let Some(hashmap) = &icon_state.unknown_settings {
-   					for (setting, value) in hashmap.iter() {
-   						signature.push_str(&format!("\t{} = {}\n", setting, value));
-   					}
-   				};
+				for (setting, value) in hashmap.iter() {
+					signature.push_str(&format!("\t{} = {}\n", setting, value));
+				}
+			};
 
 			sprites.extend(icon_state.images.iter());
 		}
@@ -403,8 +403,8 @@ impl Icon {
 /// animated [IconState]
 ///
 /// - `Indefinitely`: Loop repeatedly as long as the [IconState] is displayed
-/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32` 
-/// 
+/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32`
+///
 /// For memory efficiency reasons, looping 0 times is an invalid state.
 ///
 /// This type is effectively a newtype of `Option<NonZeroU32>`. As such, `From<Looping>` is
