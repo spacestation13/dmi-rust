@@ -169,7 +169,7 @@ impl Icon {
 			};
 
 			let name = split_version[1].as_bytes();
-			if !name.starts_with(&[b'\"']) || !name.ends_with(&[b'\"']) {
+			if !name.starts_with(b"\"") || !name.ends_with(b"\"") {
 				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
 			};
 			let name = match name.len() {
@@ -351,14 +351,11 @@ impl Icon {
 				))
 			};
 
-			match &icon_state.unknown_settings {
-				Some(hashmap) => {
-					for (setting, value) in hashmap.iter() {
-						signature.push_str(&format!("\t{} = {}\n", setting, value));
-					}
-				}
-				None => (),
-			};
+			if let Some(hashmap) = &icon_state.unknown_settings {
+   					for (setting, value) in hashmap.iter() {
+   						signature.push_str(&format!("\t{} = {}\n", setting, value));
+   					}
+   				};
 
 			sprites.extend(icon_state.images.iter());
 		}
@@ -406,8 +403,9 @@ impl Icon {
 /// animated [IconState]
 ///
 /// - `Indefinitely`: Loop repeatedly as long as the [IconState] is displayed
-/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32`
-/// for memory efficiency reasons, looping 0 times is an invalid state.
+/// - `NTimes(NonZeroU32)`: Loop N times before freezing on the final frame. Stored as a `NonZeroU32` 
+/// 
+/// For memory efficiency reasons, looping 0 times is an invalid state.
 ///
 /// This type is effectively a newtype of `Option<NonZeroU32>`. As such, `From<Looping>` is
 /// implemented for `Option<NonZeroU32>` as well as `Option<u32>`. If the more advanced combinators
