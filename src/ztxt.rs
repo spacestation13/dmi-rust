@@ -20,11 +20,11 @@ pub fn create_ztxt_chunk(dmi_signature: &[u8]) -> Result<RawZtxtChunk, error::Dm
 		compressed_text,
 		..Default::default()
 	};
-	let mut data_bytes = vec![];
+	let mut data_bytes = Vec::with_capacity(data.length());
 	data.save(&mut data_bytes)?;
 	let data_length = (data_bytes.len() as u32).to_be_bytes();
 	let chunk_type = ZTXT_TYPE;
-	let crc = crc::calculate_crc(chunk_type.iter().chain(data_bytes.iter())).to_be_bytes();
+	let crc = crc::calculate_chunk_data_crc(chunk_type, &data_bytes).to_be_bytes();
 	Ok(RawZtxtChunk {
 		data_length,
 		chunk_type,
@@ -73,7 +73,7 @@ impl RawZtxtChunk {
 			raw_chunk_bytes[total_bytes_length - 2],
 			raw_chunk_bytes[total_bytes_length - 1],
 		];
-		let calculated_crc = crc::calculate_crc(chunk_type.iter().chain(data_bytes.iter()));
+		let calculated_crc = crc::calculate_chunk_data_crc(chunk_type, data_bytes);
 		if u32::from_be_bytes(crc) != calculated_crc {
 			return Err(error::DmiError::Generic(format!("Failed to load RawZtxtChunk from reader. Given CRC ({}) does not match the calculated one ({}).", u32::from_be_bytes(crc), calculated_crc)));
 		}
@@ -130,7 +130,7 @@ impl RawZtxtChunk {
 		data.save(&mut data_bytes)?;
 		let data_length = (data_bytes.len() as u32).to_be_bytes();
 		let chunk_type = ZTXT_TYPE;
-		let crc = crc::calculate_crc(chunk_type.iter().chain(data_bytes.iter())).to_be_bytes();
+		let crc = crc::calculate_chunk_data_crc(chunk_type, &data_bytes).to_be_bytes();
 		Ok(RawZtxtChunk {
 			data_length,
 			chunk_type,
@@ -197,7 +197,7 @@ impl TryFrom<Vec<u8>> for RawZtxtChunk {
 		let data_bytes = &raw_chunk_bytes[8..(total_bytes_length - 4)];
 		let data = RawZtxtData::load(data_bytes)?;
 		let crc = [raw_chunk_bytes[total_bytes_length - 4], raw_chunk_bytes[total_bytes_length - 3], raw_chunk_bytes[total_bytes_length - 2], raw_chunk_bytes[total_bytes_length - 1]];
-		let calculated_crc = crc::calculate_crc(chunk_type.iter().chain(data_bytes.iter()));
+		let calculated_crc = crc::calculate_chunk_data_crc(chunk_type, data_bytes);
 		if u32::from_be_bytes(crc) != calculated_crc {
 			bail!("Failed to convert Vec<u8> into RawZtxtChunk. Given CRC ({}) does not match the calculated one ({}).", u32::from_be_bytes(crc), calculated_crc)
 		}
@@ -299,13 +299,12 @@ impl RawZtxtData {
 	}
 
 	fn crc(&self) -> u32 {
-		crc::calculate_crc(
-			ZTXT_TYPE
-				.iter()
-				.chain(self.keyword.iter())
-				.chain([self.null_separator, self.compression_method].iter())
-				.chain(self.compressed_text.iter()),
-		)
+		let mut hasher = crc32fast::Hasher::new();
+		hasher.update(&ZTXT_TYPE);
+		hasher.update(&self.keyword);
+		hasher.update(&[self.null_separator, self.compression_method]);
+		hasher.update(&self.compressed_text);
+		hasher.finalize()
 	}
 }
 

@@ -60,7 +60,7 @@ impl RawGenericChunk {
 			chunk_bytes[chunk_length - 1],
 		];
 
-		let recalculated_crc = crc::calculate_crc(chunk_type.iter().chain(data.iter()));
+		let recalculated_crc = crc::calculate_chunk_data_crc(chunk_type, &data);
 		if u32::from_be_bytes(crc) != recalculated_crc {
 			let chunk_name = String::from_utf8(chunk_type.to_vec())?;
 			return Err(error::DmiError::Generic(format!("Failed to load Chunk of type {}. Supplied CRC invalid: {:#?}. Its value ({}) does not match the recalculated one ({}).", chunk_name, crc, u32::from_be_bytes(crc), recalculated_crc)));
