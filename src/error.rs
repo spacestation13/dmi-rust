@@ -3,15 +3,15 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DmiError {
-	#[error("IO error")]
+	#[error("IO error: {0}")]
 	Io(#[from] io::Error),
-	#[error("Image-processing error")]
+	#[error("Image-processing error: {0}")]
 	Image(#[from] image::error::ImageError),
-	#[error("FromUtf8 error")]
+	#[error("FromUtf8 error: {0}")]
 	FromUtf8(#[from] std::string::FromUtf8Error),
-	#[error("ParseInt error")]
+	#[error("ParseInt error: {0}")]
 	ParseInt(#[from] std::num::ParseIntError),
-	#[error("ParseFloat error")]
+	#[error("ParseFloat error: {0}")]
 	ParseFloat(#[from] std::num::ParseFloatError),
 	#[error("Invalid chunk type (byte outside the range `A-Za-z`): {chunk_type:?}")]
 	InvalidChunkType { chunk_type: [u8; 4] },
