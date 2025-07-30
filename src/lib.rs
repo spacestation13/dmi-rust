@@ -182,20 +182,12 @@ impl RawDmi {
 				// Read the remainder of the chunk + 4 bytes for CRC + 8 bytes for the next header.
 				// There will always be a next header because IEND headers break before this check.
 				let mut new_dmi_bytes = vec![0u8; chunk_len + 12];
-				println!(
-					"reader pos {} bytes {dmi_bytes_read}",
-					dmi_reader.position()
-				);
 				reader.read_exact(&mut new_dmi_bytes)?;
-				println!("adding {}", new_dmi_bytes.len());
 				// Append all the new bytes to our cursor and go back to our old spot
 				dmi_reader.seek_relative(dmi_bytes_read as i64 - original_position as i64)?;
-				println!("write reader pos {}", dmi_reader.position());
 				dmi_reader.write_all(&new_dmi_bytes)?;
 				dmi_bytes_read += new_dmi_bytes.len();
 				dmi_reader.seek_relative(original_position as i64 - dmi_bytes_read as i64)?;
-				println!("new reader pos {}", dmi_reader.position());
-				println!("num {}", dmi_reader.clone().read_to_end(&mut Vec::new())?);
 			}
 
 			// Skip non-zTXt chunks
