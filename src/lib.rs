@@ -6,10 +6,11 @@ pub mod icon;
 pub mod iend;
 pub mod ztxt;
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 
 /// The PNG magic header
 pub const PNG_HEADER: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+pub const IHDR_HEADER: [u8; 8] = [0, 0, 0, 13, 73, 72, 68, 82];
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct RawDmi {
@@ -55,7 +56,7 @@ impl RawDmi {
 		let mut chunk_ihdr = None;
 		let mut chunk_ztxt = None;
 		let mut chunk_plte = None;
-		let mut chunks_idat = vec![];
+		let mut chunks_idat: Vec<chunk::RawGenericChunk> = vec![];
 		let chunk_iend;
 		let mut other_chunks = vec![];
 
@@ -118,6 +119,87 @@ impl RawDmi {
 			other_chunks,
 			chunks_idat,
 			chunk_iend,
+		})
+	}
+
+	/// Equivalent of load, but only parses IHDR and zTXt. May not catch an improperly formatted PNG file, because it only reads those headers.
+	pub fn load_meta<R: Read + Seek>(mut reader: R) -> Result<RawDmi, error::DmiError> {
+		// 8 bytes for the PNG file signature.
+		let mut png_header = [0u8; 8];
+		reader.read_exact(&mut png_header)?;
+		if png_header != PNG_HEADER {
+			return Err(error::DmiError::Generic(format!(
+				"PNG header mismatch (expected {:#?}, found {:#?})",
+				PNG_HEADER, png_header
+			)));
+		};
+		// 4 (size) + 4 (type) + 13 (data) + 4 (crc) for the IHDR chunk.
+		let mut ihdr = [0u8; 25];
+		reader.read_exact(&mut ihdr)?;
+		if ihdr[0..8] != IHDR_HEADER {
+			return Err(error::DmiError::Generic(
+				"Failed to load DMI. IHDR chunk is not in the correct location (1st chunk), has an invalid size, or an invalid identifier.".to_string(),
+			));
+		}
+		let chunk_ihdr = chunk::RawGenericChunk::load(&mut &ihdr[0..25])?;
+
+		let mut chunk_ztxt = None;
+
+		loop {
+			// Read len
+			let mut chunk_len_be: [u8; 4] = [0u8; 4];
+			reader.read_exact(&mut chunk_len_be)?;
+			let chunk_len = u32::from_be_bytes(chunk_len_be) as usize;
+
+			// Create vec for full chunk data
+			let mut chunk_full: Vec<u8> = Vec::with_capacity(chunk_len + 12);
+			chunk_full.extend_from_slice(&chunk_len_be);
+
+			// Read header into full chunk data
+			let mut chunk_header = [0u8; 4];
+			reader.read_exact(&mut chunk_header)?;
+			chunk_full.extend_from_slice(&chunk_header);
+
+			// Skip non-zTXt chunks
+			if &chunk_header != b"zTXt" {
+				// If we encounter IDAT or IEND we can just break because the zTXt header aint happening
+				if &chunk_header == b"IDAT" || &chunk_header == b"IEND" {
+					break;
+				}
+				reader.seek_relative((chunk_len + 4) as i64)?;
+				continue;
+			}
+
+			// Read actual chunk data and append
+			let mut chunk_data = vec![0; chunk_len];
+			reader.read_exact(&mut chunk_data)?;
+			chunk_full.extend_from_slice(&chunk_data);
+
+			// Read CRC into full chunk data
+			let mut chunk_crc = [0u8; 4];
+			reader.read_exact(&mut chunk_crc)?;
+			chunk_full.extend_from_slice(&chunk_crc);
+
+			let raw_chunk = chunk::RawGenericChunk::load(&mut &*chunk_full)?;
+
+			chunk_ztxt = Some(ztxt::RawZtxtChunk::try_from(raw_chunk)?);
+		}
+
+		if chunk_ztxt.is_none() {
+			return Err(error::DmiError::Generic(
+				"Failed to load DMI. zTXt chunk was not found or is after the first IDAT chunk."
+					.to_string(),
+			));
+		}
+
+		Ok(RawDmi {
+			header: PNG_HEADER,
+			chunk_ihdr,
+			chunk_ztxt,
+			chunk_plte: None,
+			other_chunks: None,
+			chunks_idat: Vec::new(),
+			chunk_iend: iend::RawIendChunk::new(),
 		})
 	}
 

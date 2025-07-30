@@ -304,6 +304,265 @@ impl Icon {
 		})
 	}
 
+	/// Equivalent of load, but only parses the DMI header and leaves all image data empty.
+	pub fn load_meta<R: Read + Seek>(reader: R) -> Result<Icon, DmiError> {
+		let raw_dmi = RawDmi::load_meta(reader)?;
+		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
+			Some(chunk) => chunk.clone(),
+			None => {
+				return Err(DmiError::Generic(
+					"Error loading icon: no zTXt chunk found.".to_string(),
+				))
+			}
+		};
+		let decompressed_text = chunk_ztxt.data.decode()?;
+		let decompressed_text = String::from_utf8(decompressed_text)?;
+		let mut decompressed_text = decompressed_text.lines();
+
+		let current_line = decompressed_text.next();
+		if current_line != Some("# BEGIN DMI") {
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: no DMI header found. Beginning: {:#?}",
+				current_line
+			)));
+		};
+
+		let current_line = match decompressed_text.next() {
+			Some(thing) => thing,
+			None => {
+				return Err(DmiError::Generic(
+					"Error loading icon: no version header found.".to_string(),
+				))
+			}
+		};
+		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
+		if split_version.len() != 2 || split_version[0] != "version" {
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: improper version header found: {:#?}",
+				split_version
+			)));
+		};
+		let version = split_version[1].to_string();
+
+		let current_line = match decompressed_text.next() {
+			Some(thing) => thing,
+			None => {
+				return Err(DmiError::Generic(
+					"Error loading icon: no width found.".to_string(),
+				))
+			}
+		};
+		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
+		if split_version.len() != 2 || split_version[0] != "\twidth" {
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: improper width found: {:#?}",
+				split_version
+			)));
+		};
+		let width = split_version[1].parse::<u32>()?;
+
+		let current_line = match decompressed_text.next() {
+			Some(thing) => thing,
+			None => {
+				return Err(DmiError::Generic(
+					"Error loading icon: no height found.".to_string(),
+				))
+			}
+		};
+		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
+		if split_version.len() != 2 || split_version[0] != "\theight" {
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: improper height found: {:#?}",
+				split_version
+			)));
+		};
+		let height = split_version[1].parse::<u32>()?;
+
+		if width == 0 || height == 0 {
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: invalid width ({}) / height ({}) values.",
+				width, height
+			)));
+		};
+
+		// Image time.
+		let mut reader = vec![];
+		raw_dmi.save(&mut reader)?;
+
+		let img_width = u32::from_be_bytes([
+			raw_dmi.chunk_ihdr.data[0],
+			raw_dmi.chunk_ihdr.data[1],
+			raw_dmi.chunk_ihdr.data[2],
+			raw_dmi.chunk_ihdr.data[3],
+		]);
+		let img_height = u32::from_be_bytes([
+			raw_dmi.chunk_ihdr.data[4],
+			raw_dmi.chunk_ihdr.data[5],
+			raw_dmi.chunk_ihdr.data[6],
+			raw_dmi.chunk_ihdr.data[7],
+		]);
+
+		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
+			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
+		};
+
+		let width_in_states = img_width / width;
+		let height_in_states = img_height / height;
+		let max_possible_states = width_in_states * height_in_states;
+
+		let mut index = 0;
+
+		let mut current_line = match decompressed_text.next() {
+			Some(thing) => thing,
+			None => {
+				return Err(DmiError::Generic(
+					"Error loading icon: no DMI trailer nor states found.".to_string(),
+				))
+			}
+		};
+
+		let mut states = vec![];
+
+		loop {
+			if current_line.contains("# END DMI") {
+				break;
+			};
+
+			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
+			if split_version.len() != 2 || split_version[0] != "state" {
+				return Err(DmiError::Generic(format!(
+					"Error loading icon: improper state found: {:#?}",
+					split_version
+				)));
+			};
+
+			let name = split_version[1].as_bytes();
+			if !name.starts_with(b"\"") || !name.ends_with(b"\"") {
+				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
+			};
+			let name = match name.len() {
+				0 | 1 => {
+					return Err(DmiError::Generic(format!(
+						"Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}",
+						name
+					)))
+				}
+				2 => String::new(), //Only the quotes, empty name otherwise.
+				length => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
+			};
+
+			let mut dirs = None;
+			let mut frames = None;
+			let mut delay = None;
+			let mut loop_flag = Looping::Indefinitely;
+			let mut rewind = false;
+			let mut movement = false;
+			let mut hotspot = None;
+			let mut unknown_settings = None;
+
+			loop {
+				current_line = match decompressed_text.next() {
+					Some(thing) => thing,
+					None => {
+						return Err(DmiError::Generic(
+							"Error loading icon: no DMI trailer found.".to_string(),
+						))
+					}
+				};
+
+				if current_line.contains("# END DMI") || current_line.contains("state = \"") {
+					break;
+				};
+				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
+				if split_version.len() != 2 {
+					return Err(DmiError::Generic(format!(
+						"Error loading icon: improper state found: {:#?}",
+						split_version
+					)));
+				};
+
+				match split_version[0] {
+					"\tdirs" => dirs = Some(split_version[1].parse::<u8>()?),
+					"\tframes" => frames = Some(split_version[1].parse::<u32>()?),
+					"\tdelay" => {
+						let mut delay_vector = vec![];
+						let text_delays = split_version[1].split_terminator(',');
+						for text_entry in text_delays {
+							delay_vector.push(text_entry.parse::<f32>()?);
+						}
+						delay = Some(delay_vector);
+					}
+					"\tloop" => loop_flag = Looping::new(split_version[1].parse::<u32>()?),
+					"\trewind" => rewind = split_version[1].parse::<u8>()? != 0,
+					"\tmovement" => movement = split_version[1].parse::<u8>()? != 0,
+					"\thotspot" => {
+						let text_coordinates: Vec<&str> = split_version[1].split_terminator(',').collect();
+						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
+						if text_coordinates.len() != 3 {
+							return Err(DmiError::Generic(format!(
+								"Error loading icon: improper hotspot found: {:#?}",
+								split_version
+							)));
+						};
+						hotspot = Some(Hotspot {
+							x: text_coordinates[0].parse::<u32>()?,
+							y: text_coordinates[1].parse::<u32>()?,
+						});
+					}
+					_ => {
+						unknown_settings = match unknown_settings {
+							None => {
+								let mut new_map = HashMap::new();
+								new_map.insert(split_version[0].to_string(), split_version[1].to_string());
+								Some(new_map)
+							}
+							Some(mut thing) => {
+								thing.insert(split_version[0].to_string(), split_version[1].to_string());
+								Some(thing)
+							}
+						};
+					}
+				};
+			}
+
+			if dirs.is_none() || frames.is_none() {
+				return Err(DmiError::Generic(format!(
+					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
+					dirs, frames
+				)));
+			};
+			let dirs = dirs.unwrap();
+			let frames = frames.unwrap();
+
+			let next_index = index + (dirs as u32 * frames);
+			if next_index > max_possible_states {
+				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({}).", max_possible_states)));
+			};
+
+			index = next_index;
+
+			states.push(IconState {
+				name,
+				dirs,
+				frames,
+				images: Vec::new(),
+				delay,
+				loop_flag,
+				rewind,
+				movement,
+				hotspot,
+				unknown_settings,
+			});
+		}
+
+		Ok(Icon {
+			version: DmiVersion(version),
+			width,
+			height,
+			states,
+		})
+	}
+
 	pub fn save<W: Write>(&self, mut writter: &mut W) -> Result<usize, DmiError> {
 		let mut sprites = vec![];
 		let mut signature = format!(
