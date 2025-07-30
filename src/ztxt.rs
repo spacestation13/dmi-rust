@@ -61,8 +61,7 @@ impl RawZtxtChunk {
 		];
 		if chunk_type != ZTXT_TYPE {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to load RawZtxtChunk from reader. Chunk type is not zTXt: {:#?}. Should be {:#?}.",
-				chunk_type, ZTXT_TYPE
+				"Failed to load RawZtxtChunk from reader. Chunk type is not zTXt: {chunk_type:#?}. Should be {ZTXT_TYPE:#?}.",
 			)));
 		}
 		let data_bytes = &raw_chunk_bytes[8..(total_bytes_length - 4)].to_vec();
@@ -74,8 +73,9 @@ impl RawZtxtChunk {
 			raw_chunk_bytes[total_bytes_length - 1],
 		];
 		let calculated_crc = crc::calculate_chunk_data_crc(chunk_type, data_bytes);
-		if u32::from_be_bytes(crc) != calculated_crc {
-			return Err(error::DmiError::Generic(format!("Failed to load RawZtxtChunk from reader. Given CRC ({}) does not match the calculated one ({}).", u32::from_be_bytes(crc), calculated_crc)));
+		let crc_le = u32::from_be_bytes(crc);
+		if crc_le != calculated_crc {
+			return Err(error::DmiError::Generic(format!("Failed to load RawZtxtChunk from reader. Given CRC ({crc_le}) does not match the calculated one ({calculated_crc}).")));
 		}
 		Ok(RawZtxtChunk {
 			data_length,
@@ -90,8 +90,7 @@ impl RawZtxtChunk {
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.data_length.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -99,8 +98,7 @@ impl RawZtxtChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.chunk_type.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -108,8 +106,7 @@ impl RawZtxtChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.data_length) as usize {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -117,8 +114,7 @@ impl RawZtxtChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.crc.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -162,8 +158,7 @@ impl TryFrom<chunk::RawGenericChunk> for RawZtxtChunk {
 		let chunk_type = raw_generic_chunk.chunk_type;
 		if chunk_type != ZTXT_TYPE {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to convert RawGenericChunk into RawZtxtChunk. Wrong type: {:#?}. Expected: {:#?}.",
-				chunk_type, ZTXT_TYPE
+				"Failed to convert RawGenericChunk into RawZtxtChunk. Wrong type: {chunk_type:#?}. Expected: {ZTXT_TYPE:#?}."
 			)));
 		};
 		let chunk_data = &raw_generic_chunk.data;
@@ -228,8 +223,7 @@ impl RawZtxtData {
 		let null_separator = 0;
 		let compression_method = data_bytes_iter.next().ok_or_else(|| {
 			error::DmiError::Generic(format!(
-				"Failed to load RawZtxtData from reader, during compression method reading.\nVector: {:#?}",
-				data_bytes
+				"Failed to load RawZtxtData from reader, during compression method reading.\nVector: {data_bytes:#?}"
 			))
 		})?;
 		//let compressed_text = RawCompressedText::try_from(back_to_vector)?;
@@ -249,8 +243,7 @@ impl RawZtxtData {
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.keyword.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt data. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt data. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -258,8 +251,7 @@ impl RawZtxtData {
 		total_bytes_written += bytes_written;
 		if bytes_written < 1 {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt data. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt data. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -267,8 +259,7 @@ impl RawZtxtData {
 		total_bytes_written += bytes_written;
 		if bytes_written < 1 {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt data. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt data. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -276,8 +267,7 @@ impl RawZtxtData {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.compressed_text.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save zTXt data. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save zTXt data. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -288,8 +278,7 @@ impl RawZtxtData {
 		match inflate::inflate_bytes_zlib(&self.compressed_text) {
 			Ok(decompressed_text) => Ok(decompressed_text),
 			Err(text) => Err(error::DmiError::Generic(format!(
-				"Failed to read compressed text. Error: {}",
-				text
+				"Failed to read compressed text. Error: {text}"
 			))),
 		}
 	}

@@ -23,7 +23,7 @@ impl RawGenericChunk {
 		let chunk_length = chunk_bytes.len();
 
 		if chunk_length < 12 {
-			return Err(error::DmiError::Generic(format!("Failed to load Chunk. Supplied reader contained size of {} bytes, lower than the required 12.", chunk_length)));
+			return Err(error::DmiError::Generic(format!("Failed to load Chunk. Supplied reader contained size of {chunk_length} bytes, lower than the required 12.")));
 		};
 
 		let data_length = [
@@ -46,8 +46,7 @@ impl RawGenericChunk {
 			.all(|c| (b'A' <= *c && *c <= b'Z') || (b'a' <= *c && *c <= b'z'))
 		{
 			return Err(error::DmiError::Generic(format!(
-				"Failed to load Chunk. Type contained unlawful characters: {:#?}",
-				chunk_type
+				"Failed to load Chunk. Type contained unlawful characters: {chunk_type:#?}",
 			)));
 		};
 
@@ -61,9 +60,10 @@ impl RawGenericChunk {
 		];
 
 		let recalculated_crc = crc::calculate_chunk_data_crc(chunk_type, &data);
-		if u32::from_be_bytes(crc) != recalculated_crc {
+		let crc_le = u32::from_be_bytes(crc);
+		if crc_le != recalculated_crc {
 			let chunk_name = String::from_utf8(chunk_type.to_vec())?;
-			return Err(error::DmiError::Generic(format!("Failed to load Chunk of type {}. Supplied CRC invalid: {:#?}. Its value ({}) does not match the recalculated one ({}).", chunk_name, crc, u32::from_be_bytes(crc), recalculated_crc)));
+			return Err(error::DmiError::Generic(format!("Failed to load Chunk of type {chunk_name}. Supplied CRC invalid: {crc:#?}. Its value ({crc_le}) does not match the recalculated one ({recalculated_crc}).")));
 		}
 
 		Ok(RawGenericChunk {
@@ -79,8 +79,7 @@ impl RawGenericChunk {
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.data_length.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save Chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save Chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -88,8 +87,7 @@ impl RawGenericChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.chunk_type.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save Chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save Chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -97,8 +95,7 @@ impl RawGenericChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.data.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save Chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save Chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -106,8 +103,7 @@ impl RawGenericChunk {
 		total_bytes_written += bytes_written;
 		if bytes_written < self.crc.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save Chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save Chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 

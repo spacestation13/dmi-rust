@@ -48,8 +48,7 @@ impl RawDmi {
 		let header = &dmi_bytes[0..8];
 		if dmi_bytes[0..8] != PNG_HEADER {
 			return Err(error::DmiError::Generic(format!(
-				"PNG header mismatch (expected {:#?}, found {:#?})",
-				PNG_HEADER, header
+				"PNG header mismatch (expected {PNG_HEADER:#?}, found {header:#?})"
 			)));
 		};
 		let header = PNG_HEADER;
@@ -65,9 +64,9 @@ impl RawDmi {
 
 		loop {
 			if index + 12 > dmi_bytes.len() {
-				return Err(error::DmiError::Generic(
-					"Failed to load DMI. Buffer end reached without finding an IEND chunk.".to_string(),
-				));
+				return Err(error::DmiError::Generic(String::from(
+					"Failed to load DMI. Buffer end reached without finding an IEND chunk.",
+				)));
 			}
 
 			let chunk_data_length = u32::from_be_bytes([
@@ -95,14 +94,14 @@ impl RawDmi {
 			}
 		}
 		if chunk_ihdr.is_none() {
-			return Err(error::DmiError::Generic(
-				"Failed to load DMI. Buffer end reached without finding an IHDR chunk.".to_string(),
-			));
+			return Err(error::DmiError::Generic(String::from(
+				"Failed to load DMI. Buffer end reached without finding an IHDR chunk.",
+			)));
 		};
 		if chunks_idat.is_empty() {
-			return Err(error::DmiError::Generic(
-				"Failed to load DMI. Buffer end reached without finding an IDAT chunk.".to_string(),
-			));
+			return Err(error::DmiError::Generic(String::from(
+				"Failed to load DMI. Buffer end reached without finding an IDAT chunk.",
+			)));
 		}
 		let other_chunks = match other_chunks.len() {
 			0 => None,
@@ -129,8 +128,7 @@ impl RawDmi {
 		reader.read_exact(&mut png_header)?;
 		if png_header != PNG_HEADER {
 			return Err(error::DmiError::Generic(format!(
-				"PNG header mismatch (expected {:#?}, found {:#?})",
-				PNG_HEADER, png_header
+				"PNG header mismatch (expected {PNG_HEADER:#?}, found {png_header:#?})"
 			)));
 		};
 		// 4 (size) + 4 (type) + 13 (data) + 4 (crc) for the IHDR chunk.
@@ -138,7 +136,7 @@ impl RawDmi {
 		reader.read_exact(&mut ihdr)?;
 		if ihdr[0..8] != IHDR_HEADER {
 			return Err(error::DmiError::Generic(
-				"Failed to load DMI. IHDR chunk is not in the correct location (1st chunk), has an invalid size, or an invalid identifier.".to_string(),
+				String::from("Failed to load DMI. IHDR chunk is not in the correct location (1st chunk), has an invalid size, or an invalid identifier."),
 			));
 		}
 		let chunk_ihdr = chunk::RawGenericChunk::load(&mut &ihdr[0..25])?;
@@ -186,10 +184,9 @@ impl RawDmi {
 		}
 
 		if chunk_ztxt.is_none() {
-			return Err(error::DmiError::Generic(
-				"Failed to load DMI. zTXt chunk was not found or is after the first IDAT chunk."
-					.to_string(),
-			));
+			return Err(error::DmiError::Generic(String::from(
+				"Failed to load DMI. zTXt chunk was not found or is after the first IDAT chunk.",
+			)));
 		}
 
 		Ok(RawDmi {
@@ -208,8 +205,7 @@ impl RawDmi {
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < 8 {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -217,8 +213,7 @@ impl RawDmi {
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.chunk_ihdr.data_length) as usize + 12 {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -227,8 +222,7 @@ impl RawDmi {
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk_ztxt.data_length) as usize + 12 {
 				return Err(error::DmiError::Generic(format!(
-					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-					total_bytes_written
+					"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 				)));
 			};
 		};
@@ -238,8 +232,7 @@ impl RawDmi {
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk_plte.data_length) as usize + 12 {
 				return Err(error::DmiError::Generic(format!(
-					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-					total_bytes_written
+					"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 				)));
 			};
 		};
@@ -250,8 +243,7 @@ impl RawDmi {
 				total_bytes_written += bytes_written;
 				if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
 					return Err(error::DmiError::Generic(format!(
-						"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-						total_bytes_written
+						"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 					)));
 				};
 			}
@@ -262,8 +254,7 @@ impl RawDmi {
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
 				return Err(error::DmiError::Generic(format!(
-					"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-					total_bytes_written
+					"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 				)));
 			};
 		}
@@ -272,8 +263,7 @@ impl RawDmi {
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.chunk_iend.data_length) as usize + 12 {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save DMI. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 

@@ -62,24 +62,22 @@ impl Icon {
 		let current_line = decompressed_text.next();
 		if current_line != Some("# BEGIN DMI") {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: no DMI header found. Beginning: {:#?}",
-				current_line
+				"Error loading icon: no DMI header found. Beginning: {current_line:#?}"
 			)));
 		};
 
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no version header found.".to_string(),
-				))
+				return Err(DmiError::Generic(String::from(
+					"Error loading icon: no version header found.",
+				)))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "version" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper version header found: {:#?}",
-				split_version
+				"Error loading icon: improper version header found: {split_version:#?}"
 			)));
 		};
 		let version = split_version[1].to_string();
@@ -95,8 +93,7 @@ impl Icon {
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\twidth" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper width found: {:#?}",
-				split_version
+				"Error loading icon: improper width found: {split_version:#?}"
 			)));
 		};
 		let width = split_version[1].parse::<u32>()?;
@@ -112,16 +109,14 @@ impl Icon {
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\theight" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper height found: {:#?}",
-				split_version
+				"Error loading icon: improper height found: {split_version:#?}"
 			)));
 		};
 		let height = split_version[1].parse::<u32>()?;
 
 		if width == 0 || height == 0 {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: invalid width ({}) / height ({}) values.",
-				width, height
+				"Error loading icon: invalid width ({width}) / height ({height}) values."
 			)));
 		};
 
@@ -135,7 +130,7 @@ impl Icon {
 		let img_height = dimensions.1;
 
 		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
-			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
+			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Missmatch with metadata width ({width}) / height ({height}).")));
 		};
 
 		let width_in_states = img_width / width;
@@ -163,20 +158,18 @@ impl Icon {
 			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 			if split_version.len() != 2 || split_version[0] != "state" {
 				return Err(DmiError::Generic(format!(
-					"Error loading icon: improper state found: {:#?}",
-					split_version
+					"Error loading icon: improper state found: {split_version:#?}"
 				)));
 			};
 
 			let name = split_version[1].as_bytes();
 			if !name.starts_with(b"\"") || !name.ends_with(b"\"") {
-				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
+				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {name:#?}")));
 			};
 			let name = match name.len() {
 				0 | 1 => {
 					return Err(DmiError::Generic(format!(
-						"Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}",
-						name
+						"Error loading icon: invalid name icon_state found in metadata, improper size: {name:#?}"
 					)))
 				}
 				2 => String::new(), //Only the quotes, empty name otherwise.
@@ -208,8 +201,7 @@ impl Icon {
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 				if split_version.len() != 2 {
 					return Err(DmiError::Generic(format!(
-						"Error loading icon: improper state found: {:#?}",
-						split_version
+						"Error loading icon: improper state found: {split_version:#?}"
 					)));
 				};
 
@@ -232,8 +224,7 @@ impl Icon {
 						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
 						if text_coordinates.len() != 3 {
 							return Err(DmiError::Generic(format!(
-								"Error loading icon: improper hotspot found: {:#?}",
-								split_version
+								"Error loading icon: improper hotspot found: {split_version:#?}"
 							)));
 						};
 						hotspot = Some(Hotspot {
@@ -259,15 +250,14 @@ impl Icon {
 
 			if dirs.is_none() || frames.is_none() {
 				return Err(DmiError::Generic(format!(
-					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
-					dirs, frames
+					"Error loading icon: state lacks essential settings. dirs: {dirs:#?}. frames: {frames:#?}."
 				)));
 			};
 			let dirs = dirs.unwrap();
 			let frames = frames.unwrap();
 
 			if index + (dirs as u32 * frames) > max_possible_states {
-				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({}).", max_possible_states)));
+				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({max_possible_states}).")));
 			};
 
 			let mut images = vec![];
@@ -322,24 +312,22 @@ impl Icon {
 		let current_line = decompressed_text.next();
 		if current_line != Some("# BEGIN DMI") {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: no DMI header found. Beginning: {:#?}",
-				current_line
+				"Error loading icon: no DMI header found. Beginning: {current_line:#?}"
 			)));
 		};
 
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no version header found.".to_string(),
-				))
+				return Err(DmiError::Generic(String::from(
+					"Error loading icon: no version header found.",
+				)))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "version" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper version header found: {:#?}",
-				split_version
+				"Error loading icon: improper version header found: {split_version:#?}"
 			)));
 		};
 		let version = split_version[1].to_string();
@@ -347,16 +335,15 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no width found.".to_string(),
-				))
+				return Err(DmiError::Generic(String::from(
+					"Error loading icon: no width found.",
+				)))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\twidth" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper width found: {:#?}",
-				split_version
+				"Error loading icon: improper width found: {split_version:#?}"
 			)));
 		};
 		let width = split_version[1].parse::<u32>()?;
@@ -364,24 +351,22 @@ impl Icon {
 		let current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no height found.".to_string(),
-				))
+				return Err(DmiError::Generic(String::from(
+					"Error loading icon: no height found.",
+				)))
 			}
 		};
 		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 		if split_version.len() != 2 || split_version[0] != "\theight" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper height found: {:#?}",
-				split_version
+				"Error loading icon: improper height found: {split_version:#?}"
 			)));
 		};
 		let height = split_version[1].parse::<u32>()?;
 
 		if width == 0 || height == 0 {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: invalid width ({}) / height ({}) values.",
-				width, height
+				"Error loading icon: invalid width ({width}) / height ({height}) values."
 			)));
 		};
 
@@ -403,7 +388,7 @@ impl Icon {
 		]);
 
 		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
-			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({}) / height ({}) values. Missmatch with metadata width ({}) / height ({}).", img_width, img_height, width, height)));
+			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Missmatch with metadata width ({width}) / height ({height}).")));
 		};
 
 		let width_in_states = img_width / width;
@@ -415,9 +400,9 @@ impl Icon {
 		let mut current_line = match decompressed_text.next() {
 			Some(thing) => thing,
 			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no DMI trailer nor states found.".to_string(),
-				))
+				return Err(DmiError::Generic(String::from(
+					"Error loading icon: no DMI trailer nor states found.",
+				)))
 			}
 		};
 
@@ -431,20 +416,18 @@ impl Icon {
 			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 			if split_version.len() != 2 || split_version[0] != "state" {
 				return Err(DmiError::Generic(format!(
-					"Error loading icon: improper state found: {:#?}",
-					split_version
+					"Error loading icon: improper state found: {split_version:#?}"
 				)));
 			};
 
 			let name = split_version[1].as_bytes();
 			if !name.starts_with(b"\"") || !name.ends_with(b"\"") {
-				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {:#?}", name)));
+				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {name:#?}")));
 			};
 			let name = match name.len() {
 				0 | 1 => {
 					return Err(DmiError::Generic(format!(
-						"Error loading icon: invalid name icon_state found in metadata, improper size: {:#?}",
-						name
+						"Error loading icon: invalid name icon_state found in metadata, improper size: {name:#?}"
 					)))
 				}
 				2 => String::new(), //Only the quotes, empty name otherwise.
@@ -464,9 +447,9 @@ impl Icon {
 				current_line = match decompressed_text.next() {
 					Some(thing) => thing,
 					None => {
-						return Err(DmiError::Generic(
-							"Error loading icon: no DMI trailer found.".to_string(),
-						))
+						return Err(DmiError::Generic(String::from(
+							"Error loading icon: no DMI trailer found.",
+						)))
 					}
 				};
 
@@ -476,8 +459,7 @@ impl Icon {
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 				if split_version.len() != 2 {
 					return Err(DmiError::Generic(format!(
-						"Error loading icon: improper state found: {:#?}",
-						split_version
+						"Error loading icon: improper state found: {split_version:#?}"
 					)));
 				};
 
@@ -500,8 +482,7 @@ impl Icon {
 						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
 						if text_coordinates.len() != 3 {
 							return Err(DmiError::Generic(format!(
-								"Error loading icon: improper hotspot found: {:#?}",
-								split_version
+								"Error loading icon: improper hotspot found: {split_version:#?}"
 							)));
 						};
 						hotspot = Some(Hotspot {
@@ -527,8 +508,7 @@ impl Icon {
 
 			if dirs.is_none() || frames.is_none() {
 				return Err(DmiError::Generic(format!(
-					"Error loading icon: state lacks essential settings. dirs: {:#?}. frames: {:#?}.",
-					dirs, frames
+					"Error loading icon: state lacks essential settings. dirs: {dirs:#?}. frames: {frames:#?}."
 				)));
 			};
 			let dirs = dirs.unwrap();
@@ -536,7 +516,7 @@ impl Icon {
 
 			let next_index = index + (dirs as u32 * frames);
 			if next_index > max_possible_states {
-				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({}).", max_possible_states)));
+				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({max_possible_states}).")));
 			};
 
 			index = next_index;
@@ -584,7 +564,7 @@ impl Icon {
 				match &icon_state.delay {
 					Some(delay) => {
 						if delay.len() as u32 != icon_state.frames {
-							return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({:3?}). Name: \"{}\".", icon_state.frames, delay, icon_state.name)))
+							return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({delay:3?}). Name: \"{}\".", icon_state.frames, icon_state.name)))
 						};
 						let delay: Vec<String>= delay.iter().map(|&c| c.to_string()).collect();
 						signature.push_str(&format!("\tdelay = {}\n", delay.join(",")));
@@ -592,7 +572,7 @@ impl Icon {
 					None => return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
 				if let Looping::NTimes(flag) = icon_state.loop_flag {
-					signature.push_str(&format!("\tloop = {}\n", flag))
+					signature.push_str(&format!("\tloop = {flag}\n"))
 				}
 				if icon_state.rewind {
 					signature.push_str("\trewind = 1\n");
@@ -612,7 +592,7 @@ impl Icon {
 
 			if let Some(hashmap) = &icon_state.unknown_settings {
 				for (setting, value) in hashmap.iter() {
-					signature.push_str(&format!("\t{} = {}\n", setting, value));
+					signature.push_str(&format!("\t{setting} = {value}\n"));
 				}
 			};
 
