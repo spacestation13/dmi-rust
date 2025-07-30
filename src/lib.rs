@@ -157,6 +157,7 @@ impl RawDmi {
 		let mut chunk_ztxt = None;
 
 		loop {
+
 			// Read len
 			let mut chunk_len_be: [u8; 4] = [0u8; 4];
 			dmi_reader.read_exact(&mut chunk_len_be)?;
@@ -178,7 +179,7 @@ impl RawDmi {
 
 			// We will overread the file's buffer.
 			let original_position = dmi_reader.position();
-			if original_position + chunk_len as u64 > dmi_bytes_read as u64 {
+			if original_position + chunk_len as u64 + 12 > dmi_bytes_read as u64 {
 				// Read the remainder of the chunk + 4 bytes for CRC + 8 bytes for the next header.
 				// There will always be a next header because IEND headers break before this check.
 				let mut new_dmi_bytes = vec![0u8; chunk_len + 12];
