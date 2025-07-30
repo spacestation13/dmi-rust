@@ -157,7 +157,6 @@ impl RawDmi {
 		let mut chunk_ztxt = None;
 
 		loop {
-
 			// Read len
 			let mut chunk_len_be: [u8; 4] = [0u8; 4];
 			dmi_reader.read_exact(&mut chunk_len_be)?;
