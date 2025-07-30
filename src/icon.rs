@@ -160,16 +160,16 @@ impl Icon {
 		})
 	}
 
-	pub fn load<R: Read>(reader: R) -> Result<Icon, DmiError> {
+	pub fn load<R: Read + Seek>(reader: R) -> Result<Icon, DmiError> {
 		Self::load_internal(reader, true)
 	}
 
-	pub fn load_meta<R: Read>(reader: R) -> Result<Icon, DmiError> {
+	pub fn load_meta<R: Read + Seek>(reader: R) -> Result<Icon, DmiError> {
 		Self::load_internal(reader, false)
 	}
 
-	fn load_internal<R: Read>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
-		let raw_dmi = RawDmi::load(reader)?;
+	fn load_internal<R: Read + Seek>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
+		let raw_dmi = if load_images { RawDmi::load(reader)? } else { RawDmi::load_meta(reader)? };
 
 		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
 			Some(chunk) => chunk.clone(),
