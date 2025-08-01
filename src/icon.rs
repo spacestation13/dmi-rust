@@ -154,7 +154,7 @@ impl Icon {
 				)?),
 				RawDmiMetadata {
 					chunk_ihdr: raw_dmi.chunk_ihdr,
-					chunk_ztxt: chunk_ztxt,
+					chunk_ztxt,
 				},
 			)
 		} else {
