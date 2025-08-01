@@ -53,11 +53,11 @@ struct DmiHeaders {
 /// The second string cannot be empty (a value must exist), or a DmiError is returned.
 /// Only one set of quotes is allowed if allow_quotes is true, and it must wrap the entire value.
 /// If require_quotes is set, will error if there are not quotes around the value.
-/// 
+///
 /// Other details about this function:
-/// 
+///
 /// Keys have very little validation and are meant to be checked against a known value in most cases.
-/// Spaces are only allowed in the value if they are inside quotes or directly after the equals sign (where they are removed). 
+/// Spaces are only allowed in the value if they are inside quotes or directly after the equals sign (where they are removed).
 /// Tabs and equals signs are only allowed in the value if they are not inside quotes.
 /// Removes quotes around values and removes backslashes for quotes inside the quotes.
 /// Removes backslashes used to escape other backslashes.
@@ -161,73 +161,73 @@ fn parse_dmi_line(
 	Ok((prior_equals, post_equals))
 }
 
-impl Icon {
-	fn read_dmi_headers(
-		decompressed_text: &mut std::iter::Peekable<std::str::Lines<'_>>,
-	) -> Result<DmiHeaders, DmiError> {
-		let current_line = decompressed_text.next();
-		if current_line != Some("# BEGIN DMI") {
-			return Err(DmiError::Generic(format!(
-				"Error loading icon: no DMI header found. Beginning: {current_line:#?}"
-			)));
-		};
+fn read_dmi_headers(
+	decompressed_text: &mut std::iter::Peekable<std::str::Lines<'_>>,
+) -> Result<DmiHeaders, DmiError> {
+	let current_line = decompressed_text.next();
+	if current_line != Some("# BEGIN DMI") {
+		return Err(DmiError::Generic(format!(
+			"Error loading icon: no DMI header found. Beginning: {current_line:#?}"
+		)));
+	};
 
-		let current_line = match decompressed_text.next() {
-			Some(thing) => thing,
+	let current_line = match decompressed_text.next() {
+		Some(thing) => thing,
+		None => {
+			return Err(DmiError::Generic(String::from(
+				"Error loading icon: no version header found.",
+			)))
+		}
+	};
+	let (key, value) = parse_dmi_line(current_line, false, false)?;
+	if key != "version" {
+		return Err(DmiError::Generic(format!(
+			"Error loading icon: improper version header found: {key} = {value} ('{current_line}')"
+		)));
+	};
+	let version = value;
+
+	let mut width = None;
+	let mut height = None;
+	for _ in 0..2 {
+		let current_line = match decompressed_text.peek() {
+			Some(thing) => *thing,
 			None => {
 				return Err(DmiError::Generic(String::from(
-					"Error loading icon: no version header found.",
+					"Error loading icon: DMI definition abruptly ends.",
 				)))
 			}
 		};
 		let (key, value) = parse_dmi_line(current_line, false, false)?;
-		if key != "version" {
-			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper version header found: {key} = {value} ('{current_line}')"
-			)));
-		};
-		let version = value;
-
-		let mut width = None;
-		let mut height = None;
-		for _ in 0..2 {
-			let current_line = match decompressed_text.peek() {
-				Some(thing) => *thing,
-				None => {
-					return Err(DmiError::Generic(String::from(
-						"Error loading icon: DMI definition abruptly ends.",
-					)))
-				}
-			};
-			let (key, value) = parse_dmi_line(current_line, false, false)?;
-			match key.as_str() {
-				"\twidth" => {
-					width = Some(value.parse::<u32>()?);
-					decompressed_text.next(); // consume the peeked value
-				}
-				"\theight" => {
-					height = Some(value.parse::<u32>()?);
-					decompressed_text.next(); // consume the peeked value
-				}
-				_ => {
-					break;
-				}
+		match key.as_str() {
+			"\twidth" => {
+				width = Some(value.parse::<u32>()?);
+				decompressed_text.next(); // consume the peeked value
+			}
+			"\theight" => {
+				height = Some(value.parse::<u32>()?);
+				decompressed_text.next(); // consume the peeked value
+			}
+			_ => {
+				break;
 			}
 		}
-
-		if width == Some(0) || height == Some(0) {
-			return Err(DmiError::Generic(format!(
-				"Error loading icon: invalid width ({width:#?}) / height ({height:#?}) values."
-			)));
-		};
-
-		Ok(DmiHeaders {
-			version,
-			width,
-			height,
-		})
 	}
 
+	if width == Some(0) || height == Some(0) {
+		return Err(DmiError::Generic(format!(
+			"Error loading icon: invalid width ({width:#?}) / height ({height:#?}) values."
+		)));
+	};
+
+	Ok(DmiHeaders {
+		version,
+		width,
+		height,
+	})
+}
+
+impl Icon {
 	pub fn load<R: Read + Seek>(reader: R) -> Result<Icon, DmiError> {
 		Self::load_internal(reader, true)
 	}
@@ -271,7 +271,7 @@ impl Icon {
 		let decompressed_text = String::from_utf8(decompressed_text)?;
 		let mut decompressed_text = decompressed_text.lines().peekable();
 
-		let dmi_headers = Self::read_dmi_headers(&mut decompressed_text)?;
+		let dmi_headers = read_dmi_headers(&mut decompressed_text)?;
 		let version = dmi_headers.version;
 
 		// yes you can make a DMI without a width or height. it defaults to 32x32
