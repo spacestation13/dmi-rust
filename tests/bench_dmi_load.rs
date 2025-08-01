@@ -4,26 +4,41 @@ use std::fs::File;
 use std::path::Path;
 use std::time::Instant;
 
+const ICONS_FOLDER: &'static str = "UPDATEME";
+
 #[test]
 fn bench_dmi_load() {
-	println!("Icon::load_meta bench");
+	let icons_folder_path = Path::new(ICONS_FOLDER);
+
+	println!("Icon::load_meta bench\n---");
 
 	let mut num_calls = 0;
 	let mut microsec_calls = 0;
-	for _ in 0..10 {
-		recurse_process(Path::new("C:\\Users\\itsmeow\\Desktop\\Development\\SS13\\tgstation\\icons"), &mut num_calls, &mut microsec_calls, false);
+	for _ in 0..25 {
+		recurse_process(
+			icons_folder_path,
+			&mut num_calls,
+			&mut microsec_calls,
+			false,
+		);
 	}
 	println!("Num calls: {num_calls}");
 	println!("Total Call Duration (μs): {microsec_calls}");
 	let mtpc = microsec_calls / num_calls as u128;
 	println!("MTPC (μs): {mtpc}");
 
-	println!("Icon::load bench");
+	println!("Icon::load bench\n---");
 
 	num_calls = 0;
 	microsec_calls = 0;
-	for _ in 0..10 {
-		recurse_process(Path::new("C:\\Users\\itsmeow\\Desktop\\Development\\SS13\\tgstation\\icons"), &mut num_calls, &mut microsec_calls, false);
+	// this is seriously slow. 2 iterations max or you'll be waiting all day
+	for _ in 0..1 {
+		recurse_process(
+			icons_folder_path,
+			&mut num_calls,
+			&mut microsec_calls,
+			false,
+		);
 	}
 	println!("Num calls: {num_calls}");
 	println!("Total Call Duration (μs): {microsec_calls}");
