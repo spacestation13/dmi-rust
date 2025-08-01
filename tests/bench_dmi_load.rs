@@ -37,7 +37,7 @@ fn bench_dmi_load() {
 			icons_folder_path,
 			&mut num_calls,
 			&mut microsec_calls,
-			false,
+			true,
 		);
 	}
 	println!("Num calls: {num_calls}");
