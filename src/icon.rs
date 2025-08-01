@@ -56,7 +56,11 @@ struct DmiHeaders {
 /// The second string cannot be empty (a value must exist), or a DmiError is returned.
 /// Only one set of quotes is allowed if allow_quotes is true, and it must wrap the entire value.
 /// If require_quotes is set, will error if there are not quotes around the value.
-fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Result<(String, String), DmiError> {
+fn parse_dmi_line(
+	line: &str,
+	allow_quotes: bool,
+	require_quotes: bool,
+) -> Result<(String, String), DmiError> {
 	let mut prior_equals = String::with_capacity(9); // 'movement' is the longest DMI key
 	let mut post_equals = String::with_capacity(line.len() - 3);
 	let mut equals_encountered = false;
@@ -73,7 +77,9 @@ fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Resul
 			match char {
 				'\\' => {
 					if !quoted_post_equals {
-						return Err(DmiError::Generic(format!("Backslash found in line with value '{line}' after first equals without quotes.")));
+						return Err(DmiError::Generic(format!(
+							"Backslash found in line with value '{line}' after first equals without quotes."
+						)));
 					}
 					if !escape_this_quote {
 						escape_quotes = true;
@@ -102,7 +108,7 @@ fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Resul
 						return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
 					}
 				}
-				' '  => {
+				' ' => {
 					if !quoted_post_equals {
 						if post_equals.is_empty() {
 							continue;
@@ -124,9 +130,11 @@ fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Resul
 					equals_encountered = true;
 					continue;
 				}
-				' '  => {
+				' ' => {
 					if char_idx + 1 == num_chars {
-						return Err(DmiError::BlockEntry(format!("Line with value '{line}' abruptly ends on a space with no equals after it.")));
+						return Err(DmiError::BlockEntry(format!(
+							"Line with value '{line}' abruptly ends on a space with no equals after it."
+						)));
 					}
 					let next_char = line_bytes[char_idx + 1] as char;
 					if next_char != '=' {
@@ -145,11 +153,10 @@ fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Resul
 			"No value was found for line: '{line}'!"
 		)));
 	};
-	return Ok((prior_equals, post_equals));
+	Ok((prior_equals, post_equals))
 }
 
 impl Icon {
-
 	fn read_dmi_headers(
 		decompressed_text: &mut std::iter::Peekable<std::str::Lines<'_>>,
 	) -> Result<DmiHeaders, DmiError> {
@@ -182,9 +189,9 @@ impl Icon {
 			let current_line = match decompressed_text.peek() {
 				Some(thing) => *thing,
 				None => {
-					return Err(DmiError::Generic(
-						String::from("Error loading icon: DMI definition abruptly ends."),
-					))
+					return Err(DmiError::Generic(String::from(
+						"Error loading icon: DMI definition abruptly ends.",
+					)))
 				}
 			};
 			let (key, value) = parse_dmi_line(current_line, false, false)?;
@@ -437,7 +444,9 @@ impl Icon {
 
 			signature.push_str(&format!(
 				"state = \"{}\"\n\tdirs = {}\n\tframes = {}\n",
-				icon_state.name.replace("\\", "\\\\").replace("\"", "\\\""), icon_state.dirs, icon_state.frames
+				icon_state.name.replace("\\", "\\\\").replace("\"", "\\\""),
+				icon_state.dirs,
+				icon_state.frames
 			));
 
 			if icon_state.frames > 1 {

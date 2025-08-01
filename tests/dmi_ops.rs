@@ -10,7 +10,6 @@ fn load_and_save_dmi() {
 		File::open(load_path.as_path()).unwrap_or_else(|_| panic!("No lights dmi: {load_path:?}"));
 	let lights_icon = Icon::load(&load_file).expect("Unable to load lights dmi");
 
-
 	assert_eq!(lights_icon.version, DmiVersion::default());
 	assert_eq!(lights_icon.width, 160);
 	assert_eq!(lights_icon.height, 160);
@@ -19,7 +18,10 @@ fn load_and_save_dmi() {
 	assert_default_state(&lights_icon.states[0], "0_1");
 	assert_default_state(&lights_icon.states[1], "1_1");
 	assert_default_state(&lights_icon.states[2], "");
-	assert_default_state(&lights_icon.states[3], "\\\\ \\    \\\"\\t\\st\\\\\\T+e=5235=!\"");
+	assert_default_state(
+		&lights_icon.states[3],
+		"\\\\ \\    \\\"\\t\\st\\\\\\T+e=5235=!\"",
+	);
 
 	let mut write_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	write_path.push("tests/resources/save_test.dmi");
@@ -40,7 +42,10 @@ fn load_and_save_dmi() {
 	assert_default_state(&reloaded_lights_icon.states[0], "0_1");
 	assert_default_state(&reloaded_lights_icon.states[1], "1_1");
 	assert_default_state(&reloaded_lights_icon.states[2], "");
-	assert_default_state(&reloaded_lights_icon.states[3], "\\\\ \\    \\\"\\t\\st\\\\\\T+e=5235=!\"");
+	assert_default_state(
+		&reloaded_lights_icon.states[3],
+		"\\\\ \\    \\\"\\t\\st\\\\\\T+e=5235=!\"",
+	);
 }
 
 fn assert_default_state(state: &IconState, name: &'static str) {
