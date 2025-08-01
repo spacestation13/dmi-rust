@@ -24,6 +24,12 @@ pub struct RawDmi {
 	pub chunk_iend: iend::RawIendChunk,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct RawDmiMetadata {
+	pub chunk_ihdr: chunk::RawGenericChunk,
+	pub chunk_ztxt: ztxt::RawZtxtChunk,
+}
+
 impl RawDmi {
 	pub fn new() -> RawDmi {
 		RawDmi {
@@ -123,7 +129,7 @@ impl RawDmi {
 	}
 
 	/// Equivalent of load, but only parses IHDR and zTXt. May not catch an improperly formatted PNG file, because it only reads those headers.
-	pub fn load_meta<R: Read + Seek>(mut reader: R) -> Result<RawDmi, error::DmiError> {
+	pub fn load_meta<R: Read + Seek>(mut reader: R) -> Result<RawDmiMetadata, error::DmiError> {
 		let mut dmi_bytes = vec![0u8; ASSUMED_ZTXT_MAX];
 
 		// Since we only want the zTXt it's unlikely to be any longer than ASSUMED_ZTXT_MAX bytes when combined with headers until we encounter it
@@ -134,11 +140,11 @@ impl RawDmi {
 			return Err(error::DmiError::Generic(format!("Failed to load DMI. Supplied reader contained size of {} bytes, lower than the required 72.", dmi_bytes.len())));
 		};
 
-		let mut dmi_reader = Cursor::new(dmi_bytes);
+		let mut buffered_dmi_bytes = Cursor::new(dmi_bytes);
 
 		// 8 bytes for the PNG file signature.
 		let mut png_header = [0u8; 8];
-		dmi_reader.read_exact(&mut png_header)?;
+		buffered_dmi_bytes.read_exact(&mut png_header)?;
 		if png_header != PNG_HEADER {
 			return Err(error::DmiError::Generic(format!(
 				"PNG header mismatch (expected {PNG_HEADER:#?}, found {png_header:#?})"
@@ -146,7 +152,7 @@ impl RawDmi {
 		};
 		// 4 (size) + 4 (type) + 13 (data) + 4 (crc) for the IHDR chunk.
 		let mut ihdr = [0u8; 25];
-		dmi_reader.read_exact(&mut ihdr)?;
+		buffered_dmi_bytes.read_exact(&mut ihdr)?;
 		if ihdr[0..8] != IHDR_HEADER {
 			return Err(error::DmiError::Generic(
 				String::from("Failed to load DMI. IHDR chunk is not in the correct location (1st chunk), has an invalid size, or an invalid identifier."),
@@ -159,7 +165,7 @@ impl RawDmi {
 		loop {
 			// Read len
 			let mut chunk_len_be: [u8; 4] = [0u8; 4];
-			dmi_reader.read_exact(&mut chunk_len_be)?;
+			buffered_dmi_bytes.read_exact(&mut chunk_len_be)?;
 			let chunk_len = u32::from_be_bytes(chunk_len_be) as usize;
 
 			// Create vec for full chunk data
@@ -168,7 +174,7 @@ impl RawDmi {
 
 			// Read header into full chunk data
 			let mut chunk_header = [0u8; 4];
-			dmi_reader.read_exact(&mut chunk_header)?;
+			buffered_dmi_bytes.read_exact(&mut chunk_header)?;
 			chunk_full.extend_from_slice(&chunk_header);
 
 			// If we encounter IDAT or IEND we can just break because the zTXt header aint happening
@@ -177,33 +183,33 @@ impl RawDmi {
 			}
 
 			// We will overread the file's buffer.
-			let original_position = dmi_reader.position();
+			let original_position = buffered_dmi_bytes.position();
 			if original_position + chunk_len as u64 + 12 > dmi_bytes_read as u64 {
 				// Read the remainder of the chunk + 4 bytes for CRC + 8 bytes for the next header.
 				// There will always be a next header because IEND headers break before this check.
 				let mut new_dmi_bytes = vec![0u8; chunk_len + 12];
 				reader.read_exact(&mut new_dmi_bytes)?;
 				// Append all the new bytes to our cursor and go back to our old spot
-				dmi_reader.seek_relative(dmi_bytes_read as i64 - original_position as i64)?;
-				dmi_reader.write_all(&new_dmi_bytes)?;
+				buffered_dmi_bytes.seek_relative(dmi_bytes_read as i64 - original_position as i64)?;
+				buffered_dmi_bytes.write_all(&new_dmi_bytes)?;
 				dmi_bytes_read += new_dmi_bytes.len();
-				dmi_reader.seek_relative(original_position as i64 - dmi_bytes_read as i64)?;
+				buffered_dmi_bytes.seek_relative(original_position as i64 - dmi_bytes_read as i64)?;
 			}
 
 			// Skip non-zTXt chunks
 			if &chunk_header != b"zTXt" {
-				dmi_reader.seek_relative((chunk_len + 4) as i64)?;
+				buffered_dmi_bytes.seek_relative((chunk_len + 4) as i64)?;
 				continue;
 			}
 
 			// Read actual chunk data and append
 			let mut chunk_data = vec![0; chunk_len];
-			dmi_reader.read_exact(&mut chunk_data)?;
+			buffered_dmi_bytes.read_exact(&mut chunk_data)?;
 			chunk_full.extend_from_slice(&chunk_data);
 
 			// Read CRC into full chunk data
 			let mut chunk_crc = [0u8; 4];
-			dmi_reader.read_exact(&mut chunk_crc)?;
+			buffered_dmi_bytes.read_exact(&mut chunk_crc)?;
 			chunk_full.extend_from_slice(&chunk_crc);
 
 			let raw_chunk = chunk::RawGenericChunk::load(&mut &*chunk_full)?;
@@ -216,15 +222,11 @@ impl RawDmi {
 				"Failed to load DMI. zTXt chunk was not found or is after the first IDAT chunk.",
 			)));
 		}
+		let chunk_ztxt = chunk_ztxt.unwrap();
 
-		Ok(RawDmi {
-			header: PNG_HEADER,
+		Ok(RawDmiMetadata {
 			chunk_ihdr,
 			chunk_ztxt,
-			chunk_plte: None,
-			other_chunks: None,
-			chunks_idat: Vec::new(),
-			chunk_iend: iend::RawIendChunk::new(),
 		})
 	}
 

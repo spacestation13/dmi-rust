@@ -1,5 +1,5 @@
 use crate::dirs::{Dirs, ALL_DIRS, CARDINAL_DIRS};
-use crate::{error::DmiError, ztxt, RawDmi};
+use crate::{error::DmiError, ztxt, RawDmi, RawDmiMetadata};
 use image::codecs::png;
 use image::{imageops, DynamicImage};
 use std::collections::HashMap;
@@ -135,20 +135,33 @@ impl Icon {
 	}
 
 	fn load_internal<R: Read + Seek>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
-		let raw_dmi = if load_images {
-			RawDmi::load(reader)?
+		let (base_image, dmi_meta) = if load_images {
+			let raw_dmi = RawDmi::load(reader)?;
+			let mut rawdmi_temp = vec![];
+			raw_dmi.save(&mut rawdmi_temp)?;
+			let chunk_ztxt = match raw_dmi.chunk_ztxt {
+				Some(chunk) => chunk,
+				None => {
+					return Err(DmiError::Generic(String::from(
+						"Error loading icon: no zTXt chunk found.",
+					)))
+				}
+			};
+			(
+				Some(image::load_from_memory_with_format(
+					&rawdmi_temp,
+					image::ImageFormat::Png,
+				)?),
+				RawDmiMetadata {
+					chunk_ihdr: raw_dmi.chunk_ihdr,
+					chunk_ztxt: chunk_ztxt,
+				},
+			)
 		} else {
-			RawDmi::load_meta(reader)?
+			(None, RawDmi::load_meta(reader)?)
 		};
 
-		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
-			Some(chunk) => chunk,
-			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: no zTXt chunk found.".to_string(),
-				))
-			}
-		};
+		let chunk_ztxt = &dmi_meta.chunk_ztxt;
 		let decompressed_text = chunk_ztxt.data.decode()?;
 		let decompressed_text = String::from_utf8(decompressed_text)?;
 		let mut decompressed_text = decompressed_text.lines().peekable();
@@ -160,29 +173,11 @@ impl Icon {
 		let width = dmi_headers.width.unwrap_or(32);
 		let height = dmi_headers.height.unwrap_or(32);
 
-		let img_width: u32 = u32::from_be_bytes([
-			raw_dmi.chunk_ihdr.data[0],
-			raw_dmi.chunk_ihdr.data[1],
-			raw_dmi.chunk_ihdr.data[2],
-			raw_dmi.chunk_ihdr.data[3],
-		]);
-		let img_height = u32::from_be_bytes([
-			raw_dmi.chunk_ihdr.data[4],
-			raw_dmi.chunk_ihdr.data[5],
-			raw_dmi.chunk_ihdr.data[6],
-			raw_dmi.chunk_ihdr.data[7],
-		]);
+		let ihdr_data = dmi_meta.chunk_ihdr.data;
 
-		let base_image = if load_images {
-			let mut reader = vec![];
-			raw_dmi.save(&mut reader)?;
-			Some(image::load_from_memory_with_format(
-				&reader,
-				image::ImageFormat::Png,
-			)?)
-		} else {
-			None
-		};
+		let img_width: u32 =
+			u32::from_be_bytes([ihdr_data[0], ihdr_data[1], ihdr_data[2], ihdr_data[3]]);
+		let img_height = u32::from_be_bytes([ihdr_data[4], ihdr_data[5], ihdr_data[6], ihdr_data[7]]);
 
 		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
 			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Missmatch with metadata width ({width}) / height ({height}).")));
@@ -319,7 +314,7 @@ impl Icon {
 			let mut images = vec![];
 
 			if let Some(full_image) = base_image.as_ref() {
-				for image_idx in index..(index + (frames*dirs as u32)) {
+				for image_idx in index..(index + (frames * dirs as u32)) {
 					let x = (image_idx % width_in_states) * width;
 					//This operation rounds towards zero, truncating any fractional part of the exact result, essentially a floor() function.
 					let y = (image_idx / width_in_states) * height;
@@ -470,7 +465,7 @@ impl Looping {
 	pub fn new(x: u32) -> Self {
 		match x {
 			0 => Self::default(),
-			_ => Self::NTimes(NonZeroU32::new(x).unwrap())
+			_ => Self::NTimes(NonZeroU32::new(x).unwrap()),
 		}
 	}
 
