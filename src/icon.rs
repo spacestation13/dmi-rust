@@ -65,100 +65,64 @@ fn parse_dmi_line(
 	line: &str,
 	allow_quotes: bool,
 	require_quotes: bool,
-) -> Result<(String, String), DmiError> {
-	let mut prior_equals = String::with_capacity(9); // 'movement' is the longest DMI key
-	let mut post_equals = String::with_capacity(line.len() - 3);
-	let mut equals_encountered = false;
-	let mut quoted_post_equals = false;
-	let mut escape_quotes = false;
-	let mut quotes_ended = false;
-	let num_chars = line.len();
-	let line_bytes = line.as_bytes();
+) -> Result<(&str, String), DmiError> {
+	let line_split = line.split_once(" = ");
+	if line_split.is_none() {
+		return Err(DmiError::BlockEntry(format!("No value was found for line: '{line}' (must contain ' = ')!")));
+	}
+	let line_split = line_split.unwrap();
+	// Now we need to parse after the equals
+	let num_chars = line_split.1.len();
+	let mut post_equals = String::with_capacity(num_chars - if require_quotes { 2 } else { 0 });
+
+	// Flags
+	let mut quoted = false;
+	let mut escaped = false;
+
+	let value_bytes = line_split.1.as_bytes();
 	for char_idx in 0..num_chars {
-		let char = line_bytes[char_idx] as char;
-		if equals_encountered {
-			let escape_this_quote = escape_quotes;
-			escape_quotes = false;
-			match char {
-				'\\' => {
-					if !quoted_post_equals {
-						return Err(DmiError::Generic(format!(
-							"Backslash found in line with value '{line}' after first equals without quotes."
-						)));
-					}
-					if !escape_this_quote {
-						escape_quotes = true;
-						continue;
-					}
+		let char: char = value_bytes[char_idx] as char;
+		let escape_this_char = escaped;
+		escaped = false;
+		match char {
+			'\\' => {
+				if !quoted {
+					return Err(DmiError::Generic(format!(
+						"Backslash found in line with value '{line}' after first equals without quotes."
+					)));
 				}
-				'"' => {
-					if !allow_quotes {
-						return Err(DmiError::Generic(format!("Quote found in line with value '{line}' after first equals where they are not allowed.")));
-					}
-					if !escape_this_quote {
-						if quoted_post_equals && char_idx + 1 != num_chars {
-							return Err(DmiError::BlockEntry(format!("Line with value '{line}' ends quotes prior to the last character on the line. This is not allowed.")));
-						} else if !quoted_post_equals && !post_equals.is_empty() {
-							return Err(DmiError::BlockEntry(format!("Line with value '{line}' starts quotes after the first character in its value. This is not allowed.")));
-						}
-						quoted_post_equals = !quoted_post_equals;
-						if !quoted_post_equals {
-							quotes_ended = true;
-						}
-						continue;
-					}
-				}
-				'\t' | '=' => {
-					if !quoted_post_equals {
-						return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
-					}
-				}
-				' ' => {
-					if !quoted_post_equals {
-						if post_equals.is_empty() {
-							continue;
-						} else {
-							return Err(DmiError::BlockEntry(format!("Space found in line with value '{line}' after first equals without quotes. Only one space is allowed directly after the equals sign.")));
-						}
-					}
-				}
-				_ => {}
-			}
-			if allow_quotes && require_quotes && !quoted_post_equals {
-				return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not quote all its contents!")));
-			}
-			post_equals.push(char);
-		} else {
-			// Keys (prior to equals) are almost always checked against a value, so there's no point in doing extensive checks ourselves.
-			match char {
-				'=' => {
-					equals_encountered = true;
+				if !escape_this_char {
+					escaped = true;
 					continue;
 				}
-				' ' => {
-					if char_idx + 1 == num_chars {
-						return Err(DmiError::BlockEntry(format!(
-							"Line with value '{line}' abruptly ends on a space with no equals after it."
-						)));
-					}
-					let next_char = line_bytes[char_idx + 1] as char;
-					if next_char != '=' {
-						return Err(DmiError::BlockEntry(format!("Line with value '{line}' contains a space not directly prior to an equals sign before the first equals sign was encountered.")));
-					} else {
-						continue;
-					}
-				}
-				_ => {}
 			}
-			prior_equals.push(char);
+			'"' => {
+				if !allow_quotes {
+					return Err(DmiError::Generic(format!("Quote found in line with value '{line}' after first equals where they are not allowed.")));
+				}
+				if !escape_this_char {
+					if quoted && char_idx + 1 != num_chars {
+						return Err(DmiError::BlockEntry(format!("Line with value '{line}' ends quotes prior to the last character on the line. This is not allowed.")));
+					} else if !quoted && !post_equals.is_empty() {
+						return Err(DmiError::BlockEntry(format!("Line with value '{line}' starts quotes after the first character in its value. This is not allowed.")));
+					}
+					quoted = !quoted;
+					continue;
+				}
+			}
+			'\t' | '=' | ' ' => {
+				if !quoted {
+					return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
+				}
+			}
+			_ => {}
 		}
+		if allow_quotes && require_quotes && !quoted {
+			return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not quote all its contents!")));
+		}
+		post_equals.push(char);
 	}
-	if post_equals.is_empty() && !quotes_ended {
-		return Err(DmiError::BlockEntry(format!(
-			"No value was found for line: '{line}'!"
-		)));
-	};
-	Ok((prior_equals, post_equals))
+	Ok((line_split.0, post_equals))
 }
 
 fn read_dmi_headers(
@@ -199,7 +163,7 @@ fn read_dmi_headers(
 			}
 		};
 		let (key, value) = parse_dmi_line(current_line, false, false)?;
-		match key.as_str() {
+		match key {
 			"\twidth" => {
 				width = Some(value.parse::<u32>()?);
 				decompressed_text.next(); // consume the peeked value
@@ -343,7 +307,7 @@ impl Icon {
 				};
 				let (key, value) = parse_dmi_line(current_line, false, false)?;
 
-				match key.as_str() {
+				match key {
 					"\tdirs" => dirs = Some(value.parse::<u8>()?),
 					"\tframes" => frames = Some(value.parse::<u32>()?),
 					"\tdelay" => {
@@ -371,18 +335,19 @@ impl Icon {
 						});
 					}
 					_ => {
-						let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-						unknown_settings = match unknown_settings {
-							None => {
-								let mut new_map = HashMap::new();
-								new_map.insert(split_version[0].to_string(), split_version[1].to_string());
-								Some(new_map)
-							}
-							Some(mut thing) => {
-								thing.insert(split_version[0].to_string(), split_version[1].to_string());
-								Some(thing)
-							}
-						};
+						if let Some((key, value)) = current_line.split_once(" = ") {
+							unknown_settings = match unknown_settings {
+								None => {
+									let mut new_map = HashMap::new();
+									new_map.insert(key.to_string(), value.to_string());
+									Some(new_map)
+								}
+								Some(mut thing) => {
+									thing.insert(key.to_string(), value.to_string());
+									Some(thing)
+								}
+							};
+						}
 					}
 				};
 			}
