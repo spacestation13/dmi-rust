@@ -201,7 +201,7 @@ impl Icon {
 		let mut states = vec![];
 
 		loop {
-			if current_line.contains("# END DMI") {
+			if current_line == "# END DMI" {
 				break;
 			};
 
@@ -245,7 +245,7 @@ impl Icon {
 					}
 				};
 
-				if current_line.contains("# END DMI") || current_line.contains("state = \"") {
+				if current_line == "# END DMI" || current_line.starts_with("state = \"") {
 					break;
 				};
 				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
