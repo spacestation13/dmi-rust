@@ -78,72 +78,35 @@ impl Icon {
 
 		let mut width = None;
 		let mut height = None;
+		for _ in 0..2 {
+			let current_line = match decompressed_text.peek() {
+				Some(thing) => *thing,
+				None => {
+					return Err(DmiError::Generic(
+						"Error loading icon: DMI definition abruptly ends.".to_string(),
+					))
+				}
+			};
+			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 
-		let current_line = match decompressed_text.peek() {
-			Some(thing) => *thing,
-			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: DMI definition abruptly ends.".to_string(),
-				))
+			if split_version.len() != 2 {
+				return Err(DmiError::Generic(format!(
+					"Error loading icon: improper line entry found: {split_version:#?}"
+				)));
 			}
-		};
-		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 
-		if split_version.len() != 2 {
-			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper line entry found: {split_version:#?}"
-			)));
-		}
-
-		match split_version[0] {
-			"\twidth" => {
-				width = Some(split_version[1].parse::<u32>()?);
-				decompressed_text.next(); // consume the peeked value
-			}
-			"\theight" => {
-				height = Some(split_version[1].parse::<u32>()?);
-				decompressed_text.next(); // consume the peeked value
-			}
-			_ => {
-				return Ok(DmiHeaders {
-					version,
-					width,
-					height,
-				})
-			}
-		}
-
-		let current_line = match decompressed_text.peek() {
-			Some(thing) => *thing,
-			None => {
-				return Err(DmiError::Generic(
-					"Error loading icon: DMI definition abruptly ends.".to_string(),
-				))
-			}
-		};
-		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-
-		if split_version.len() != 2 {
-			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper line entry found: {split_version:#?}"
-			)));
-		}
-
-		match split_version[0] {
-			"\twidth" => {
-				width = Some(split_version[1].parse::<u32>()?);
-				decompressed_text.next(); // consume the peeked value
-			}
-			"\theight" => {
-				height = Some(split_version[1].parse::<u32>()?);
-				decompressed_text.next(); // consume the peeked value
-			}
-			_ => {
-				return Ok(DmiHeaders {
-					version,
-					width,
-					height,
-				})
+			match split_version[0] {
+				"\twidth" => {
+					width = Some(split_version[1].parse::<u32>()?);
+					decompressed_text.next(); // consume the peeked value
+				}
+				"\theight" => {
+					height = Some(split_version[1].parse::<u32>()?);
+					decompressed_text.next(); // consume the peeked value
+				}
+				_ => {
+					break;
+				}
 			}
 		}
 
@@ -164,6 +127,9 @@ impl Icon {
 		Self::load_internal(reader, true)
 	}
 
+	/// Returns an Icon {} without any images inside of the IconStates and with less error validation.
+	/// This is suitable for reading DMI metadata without caring about the actual images within.
+	/// Can load a full DMI about 10x faster than Icon::load.
 	pub fn load_meta<R: Read + Seek>(reader: R) -> Result<Icon, DmiError> {
 		Self::load_internal(reader, false)
 	}
@@ -176,7 +142,7 @@ impl Icon {
 		};
 
 		let chunk_ztxt = match &raw_dmi.chunk_ztxt {
-			Some(chunk) => chunk.clone(),
+			Some(chunk) => chunk,
 			None => {
 				return Err(DmiError::Generic(
 					"Error loading icon: no zTXt chunk found.".to_string(),
@@ -194,7 +160,7 @@ impl Icon {
 		let width = dmi_headers.width.unwrap_or(32);
 		let height = dmi_headers.height.unwrap_or(32);
 
-		let img_width = u32::from_be_bytes([
+		let img_width: u32 = u32::from_be_bytes([
 			raw_dmi.chunk_ihdr.data[0],
 			raw_dmi.chunk_ihdr.data[1],
 			raw_dmi.chunk_ihdr.data[2],
@@ -305,12 +271,7 @@ impl Icon {
 						}
 						delay = Some(delay_vector);
 					}
-					"\tloop" => {
-						let loop_raw = split_version[1].parse::<u32>()?;
-						if loop_raw != 0 {
-							loop_flag = Looping::new(loop_raw);
-						}
-					}
+					"\tloop" => loop_flag = Looping::new(split_version[1].parse::<u32>()?),
 					"\trewind" => rewind = split_version[1].parse::<u8>()? != 0,
 					"\tmovement" => movement = split_version[1].parse::<u8>()? != 0,
 					"\thotspot" => {
@@ -358,16 +319,11 @@ impl Icon {
 			let mut images = vec![];
 
 			if let Some(full_image) = base_image.as_ref() {
-				let mut image_offset = 0;
-				for _frame in 0..frames {
-					for _dir in 0..dirs {
-						let full_image_offset = index + image_offset;
-						let x = (full_image_offset % width_in_states) * width;
-						//This operation rounds towards zero, truncating any fractional part of the exact result, essentially a floor() function.
-						let y = (full_image_offset / width_in_states) * height;
-						images.push(full_image.crop_imm(x, y, width, height));
-						image_offset += 1;
-					}
+				for image_idx in index..(index + (frames*dirs as u32)) {
+					let x = (image_idx % width_in_states) * width;
+					//This operation rounds towards zero, truncating any fractional part of the exact result, essentially a floor() function.
+					let y = (image_idx / width_in_states) * height;
+					images.push(full_image.crop_imm(x, y, width, height));
 				}
 			}
 
@@ -512,7 +468,10 @@ pub enum Looping {
 impl Looping {
 	/// Creates a new `NTimes` variant with `x` number of times to loop
 	pub fn new(x: u32) -> Self {
-		Self::NTimes(NonZeroU32::new(x).unwrap())
+		match x {
+			0 => Self::default(),
+			_ => Self::NTimes(NonZeroU32::new(x).unwrap())
+		}
 	}
 
 	/// Unwraps the Looping yielding the `u32` if the `Looping` is a `Looping::NTimes`
