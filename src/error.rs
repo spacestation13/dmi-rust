@@ -19,6 +19,8 @@ pub enum DmiError {
 	CrcMismatch { stated: u32, calculated: u32 },
 	#[error("Dmi error: {0}")]
 	Generic(String),
+	#[error("Dmi block entry error: {0}")]
+	BlockEntry(String),
 	#[error("Dmi IconState error: {0}")]
 	IconState(String),
 	#[error("Encoding error: {0}")]

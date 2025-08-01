@@ -49,7 +49,107 @@ struct DmiHeaders {
 	height: Option<u32>,
 }
 
+/// Splits the line of a DMI entry into a key/value pair on the equals sign.
+/// Removes spaces or equals signs that are not inside quotes.
+/// Tabs are left intact only prior to the first equals sign, and only as the first character parsed.
+/// Removes quotes around values and escape characters for quotes inside the quotes.
+/// The second string cannot be empty (a value must exist), or a DmiError is returned.
+/// Only one set of quotes is allowed if allow_quotes is true, and it must wrap the entire value.
+/// If require_quotes is set, will error if there are not quotes around the value.
+fn parse_dmi_line(line: &str, allow_quotes: bool, require_quotes: bool) -> Result<(String, String), DmiError> {
+	let mut prior_equals = String::with_capacity(9); // 'movement' is the longest DMI key
+	let mut post_equals = String::with_capacity(line.len() - 3);
+	let mut equals_encountered = false;
+	let mut quoted_post_equals = false;
+	let mut escape_quotes = false;
+	let mut quotes_ended = false;
+	let num_chars = line.len();
+	let line_bytes = line.as_bytes();
+	for char_idx in 0..num_chars {
+		let char = line_bytes[char_idx] as char;
+		if equals_encountered {
+			let escape_this_quote = escape_quotes;
+			escape_quotes = false;
+			match char {
+				'\\' => {
+					if !quoted_post_equals {
+						return Err(DmiError::Generic(format!("Backslash found in line with value '{line}' after first equals without quotes.")));
+					}
+					if !escape_this_quote {
+						escape_quotes = true;
+						continue;
+					}
+				}
+				'"' => {
+					if !allow_quotes {
+						return Err(DmiError::Generic(format!("Quote found in line with value '{line}' after first equals where they are not allowed.")));
+					}
+					if !escape_this_quote {
+						if quoted_post_equals && char_idx + 1 != num_chars {
+							return Err(DmiError::BlockEntry(format!("Line with value '{line}' ends quotes prior to the last character on the line. This is not allowed.")));
+						} else if !quoted_post_equals && !post_equals.is_empty() {
+							return Err(DmiError::BlockEntry(format!("Line with value '{line}' starts quotes after the first character in its value. This is not allowed.")));
+						}
+						quoted_post_equals = !quoted_post_equals;
+						if !quoted_post_equals {
+							quotes_ended = true;
+						}
+						continue;
+					}
+				}
+				'\t' | '=' => {
+					if !quoted_post_equals {
+						return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
+					}
+				}
+				' '  => {
+					if !quoted_post_equals {
+						if post_equals.is_empty() {
+							continue;
+						} else {
+							return Err(DmiError::BlockEntry(format!("Space found in line with value '{line}' after first equals without quotes. Only one space is allowed directly after the equals sign.")));
+						}
+					}
+				}
+				_ => {}
+			}
+			if allow_quotes && require_quotes && !quoted_post_equals {
+				return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not quote all its contents!")));
+			}
+			post_equals.push(char);
+		} else {
+			// Keys (prior to equals) are almost always checked against a value, so there's no point in doing extensive checks ourselves.
+			match char {
+				'=' => {
+					equals_encountered = true;
+					continue;
+				}
+				' '  => {
+					if char_idx + 1 == num_chars {
+						return Err(DmiError::BlockEntry(format!("Line with value '{line}' abruptly ends on a space with no equals after it.")));
+					}
+					let next_char = line_bytes[char_idx + 1] as char;
+					if next_char != '=' {
+						return Err(DmiError::BlockEntry(format!("Line with value '{line}' contains a space not directly prior to an equals sign before the first equals sign was encountered.")));
+					} else {
+						continue;
+					}
+				}
+				_ => {}
+			}
+			prior_equals.push(char);
+		}
+	}
+	if post_equals.is_empty() && !quotes_ended {
+		return Err(DmiError::BlockEntry(format!(
+			"No value was found for line: '{line}'!"
+		)));
+	};
+	return Ok((prior_equals, post_equals));
+}
+
 impl Icon {
+
 	fn read_dmi_headers(
 		decompressed_text: &mut std::iter::Peekable<std::str::Lines<'_>>,
 	) -> Result<DmiHeaders, DmiError> {
@@ -68,13 +168,13 @@ impl Icon {
 				)))
 			}
 		};
-		let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-		if split_version.len() != 2 || split_version[0] != "version" {
+		let (key, value) = parse_dmi_line(current_line, false, false)?;
+		if key != "version" {
 			return Err(DmiError::Generic(format!(
-				"Error loading icon: improper version header found: {split_version:#?}"
+				"Error loading icon: improper version header found: {key} = {value} ('{current_line}')"
 			)));
 		};
-		let version = split_version[1].to_string();
+		let version = value;
 
 		let mut width = None;
 		let mut height = None;
@@ -83,25 +183,18 @@ impl Icon {
 				Some(thing) => *thing,
 				None => {
 					return Err(DmiError::Generic(
-						"Error loading icon: DMI definition abruptly ends.".to_string(),
+						String::from("Error loading icon: DMI definition abruptly ends."),
 					))
 				}
 			};
-			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-
-			if split_version.len() != 2 {
-				return Err(DmiError::Generic(format!(
-					"Error loading icon: improper line entry found: {split_version:#?}"
-				)));
-			}
-
-			match split_version[0] {
+			let (key, value) = parse_dmi_line(current_line, false, false)?;
+			match key.as_str() {
 				"\twidth" => {
-					width = Some(split_version[1].parse::<u32>()?);
+					width = Some(value.parse::<u32>()?);
 					decompressed_text.next(); // consume the peeked value
 				}
 				"\theight" => {
-					height = Some(split_version[1].parse::<u32>()?);
+					height = Some(value.parse::<u32>()?);
 					decompressed_text.next(); // consume the peeked value
 				}
 				_ => {
@@ -205,26 +298,14 @@ impl Icon {
 				break;
 			};
 
-			let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-			if split_version.len() != 2 || split_version[0] != "state" {
+			let (key, value) = parse_dmi_line(current_line, true, true)?;
+			if key != "state" {
 				return Err(DmiError::Generic(format!(
-					"Error loading icon: improper state found: {split_version:#?}"
+					"Error loading icon: Was expecting the next line's entry to have a key of 'state', but encountered '{key}'! The full line contents are as follows: '{current_line}'"
 				)));
 			};
 
-			let name = split_version[1].as_bytes();
-			if !name.starts_with(b"\"") || !name.ends_with(b"\"") {
-				return Err(DmiError::Generic(format!("Error loading icon: invalid name icon_state found in metadata, should be preceded and succeeded by double-quotes (\"): {name:#?}")));
-			};
-			let name = match name.len() {
-				0 | 1 => {
-					return Err(DmiError::Generic(format!(
-						"Error loading icon: invalid name icon_state found in metadata, improper size: {name:#?}"
-					)))
-				}
-				2 => String::new(), //Only the quotes, empty name otherwise.
-				length => String::from_utf8(name[1..(length - 1)].to_vec())?, //Hacky way to trim. Blame the cool methods being nightly experimental.
-			};
+			let name: String = value;
 
 			let mut dirs = None;
 			let mut frames = None;
@@ -245,36 +326,31 @@ impl Icon {
 					}
 				};
 
-				if current_line == "# END DMI" || current_line.starts_with("state = \"") {
+				if current_line == "# END DMI" || !current_line.starts_with('\t') {
 					break;
 				};
-				let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
-				if split_version.len() != 2 {
-					return Err(DmiError::Generic(format!(
-						"Error loading icon: improper state found: {split_version:#?}"
-					)));
-				};
+				let (key, value) = parse_dmi_line(current_line, false, false)?;
 
-				match split_version[0] {
-					"\tdirs" => dirs = Some(split_version[1].parse::<u8>()?),
-					"\tframes" => frames = Some(split_version[1].parse::<u32>()?),
+				match key.as_str() {
+					"\tdirs" => dirs = Some(value.parse::<u8>()?),
+					"\tframes" => frames = Some(value.parse::<u32>()?),
 					"\tdelay" => {
 						let mut delay_vector = vec![];
-						let text_delays = split_version[1].split_terminator(',');
+						let text_delays = value.split_terminator(',');
 						for text_entry in text_delays {
 							delay_vector.push(text_entry.parse::<f32>()?);
 						}
 						delay = Some(delay_vector);
 					}
-					"\tloop" => loop_flag = Looping::new(split_version[1].parse::<u32>()?),
-					"\trewind" => rewind = split_version[1].parse::<u8>()? != 0,
-					"\tmovement" => movement = split_version[1].parse::<u8>()? != 0,
+					"\tloop" => loop_flag = Looping::new(value.parse::<u32>()?),
+					"\trewind" => rewind = value.parse::<u8>()? != 0,
+					"\tmovement" => movement = value.parse::<u8>()? != 0,
 					"\thotspot" => {
-						let text_coordinates: Vec<&str> = split_version[1].split_terminator(',').collect();
+						let text_coordinates: Vec<&str> = value.split_terminator(',').collect();
 						// Hotspot includes a mysterious 3rd parameter that always seems to be 1.
 						if text_coordinates.len() != 3 {
 							return Err(DmiError::Generic(format!(
-								"Error loading icon: improper hotspot found: {split_version:#?}"
+								"Error loading icon: improper hotspot found: {current_line:#?}"
 							)));
 						};
 						hotspot = Some(Hotspot {
@@ -283,6 +359,7 @@ impl Icon {
 						});
 					}
 					_ => {
+						let split_version: Vec<&str> = current_line.split_terminator(" = ").collect();
 						unknown_settings = match unknown_settings {
 							None => {
 								let mut new_map = HashMap::new();
@@ -360,7 +437,7 @@ impl Icon {
 
 			signature.push_str(&format!(
 				"state = \"{}\"\n\tdirs = {}\n\tframes = {}\n",
-				icon_state.name, icon_state.dirs, icon_state.frames
+				icon_state.name.replace("\\", "\\\\").replace("\"", "\\\""), icon_state.dirs, icon_state.frames
 			));
 
 			if icon_state.frames > 1 {
