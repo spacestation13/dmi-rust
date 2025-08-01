@@ -265,36 +265,43 @@ impl Icon {
 			// EXPAND and ALPHA do not expand grayscale images into RGBA. We can just do this manually.
 			match info.color_type {
 				ColorType::GrayscaleAlpha => {
-            if rgba_buf.len() as u32 != info.width * info.height * 2 {
-                return Err(DmiError::Generic(String::from("GrayscaleAlpha buffer length mismatch")));
-            }
-						let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
-            for chunk in rgba_buf.chunks(2) {
-                let gray = chunk[0];
-                let alpha = chunk[1];
-                new_buf.push(gray);
-                new_buf.push(gray);
-                new_buf.push(gray);
-                new_buf.push(alpha);
-            }
-						rgba_buf = new_buf;
-        }
-        ColorType::Grayscale => {
-            if rgba_buf.len() as u32 != info.width * info.height {
-                return Err(DmiError::Generic(String::from("Grayscale buffer length mismatch")));
-            }
-						let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
-            for gray in rgba_buf {
-                new_buf.push(gray);
-                new_buf.push(gray);
-                new_buf.push(gray);
-                new_buf.push(255);
-            }
-						rgba_buf = new_buf;
-        }
+					if rgba_buf.len() as u32 != info.width * info.height * 2 {
+						return Err(DmiError::Generic(String::from(
+							"GrayscaleAlpha buffer length mismatch",
+						)));
+					}
+					let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+					for chunk in rgba_buf.chunks(2) {
+						let gray = chunk[0];
+						let alpha = chunk[1];
+						new_buf.push(gray);
+						new_buf.push(gray);
+						new_buf.push(gray);
+						new_buf.push(alpha);
+					}
+					rgba_buf = new_buf;
+				}
+				ColorType::Grayscale => {
+					if rgba_buf.len() as u32 != info.width * info.height {
+						return Err(DmiError::Generic(String::from(
+							"Grayscale buffer length mismatch",
+						)));
+					}
+					let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+					for gray in rgba_buf {
+						new_buf.push(gray);
+						new_buf.push(gray);
+						new_buf.push(gray);
+						new_buf.push(255);
+					}
+					rgba_buf = new_buf;
+				}
 				ColorType::Rgba => {}
 				_ => {
-					return Err(DmiError::Generic(format!("Unsupported ColorType (must be RGBA or convertible to RGBA): {:#?}", info.color_type)));
+					return Err(DmiError::Generic(format!(
+						"Unsupported ColorType (must be RGBA or convertible to RGBA): {:#?}",
+						info.color_type
+					)));
 				}
 			}
 

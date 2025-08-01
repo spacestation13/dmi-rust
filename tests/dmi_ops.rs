@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 #[test]
 fn load_and_save_dmi() {
-
 	let mut load_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	load_path.push("tests/resources/empty.dmi");
 	let load_file =
@@ -13,8 +12,8 @@ fn load_and_save_dmi() {
 
 	let mut load_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	load_path.push("tests/resources/greyscale_alpha.dmi");
-	let load_file =
-		File::open(load_path.as_path()).unwrap_or_else(|_| panic!("No greyscale_alpha dmi: {load_path:?}"));
+	let load_file = File::open(load_path.as_path())
+		.unwrap_or_else(|_| panic!("No greyscale_alpha dmi: {load_path:?}"));
 	let _ = Icon::load(&load_file).expect("Unable to greyscale_alpha dmi");
 
 	let mut load_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
