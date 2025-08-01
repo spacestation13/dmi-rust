@@ -1,3 +1,4 @@
+use png::DecodingError;
 use std::io;
 use thiserror::Error;
 
@@ -5,6 +6,8 @@ use thiserror::Error;
 pub enum DmiError {
 	#[error("IO error: {0}")]
 	Io(#[from] io::Error),
+	#[error("PNG decoding error: {0}")]
+	PngDecoding(#[from] DecodingError),
 	#[error("Image-processing error: {0}")]
 	Image(#[from] image::error::ImageError),
 	#[error("FromUtf8 error: {0}")]

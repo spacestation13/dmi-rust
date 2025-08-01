@@ -1,7 +1,8 @@
 use crate::dirs::{Dirs, ALL_DIRS, CARDINAL_DIRS};
 use crate::{error::DmiError, ztxt, RawDmi, RawDmiMetadata};
+use ::png::{ColorType, Decoder, Transformations};
 use image::codecs::png;
-use image::{imageops, DynamicImage};
+use image::{imageops, RgbaImage};
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -208,30 +209,105 @@ impl Icon {
 	}
 
 	fn load_internal<R: Read + Seek>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
-		let (base_image, dmi_meta) = if load_images {
+		let (dmi_meta, rgba_bytes) = if load_images {
 			let raw_dmi = RawDmi::load(reader)?;
-			let mut rawdmi_temp = vec![];
-			raw_dmi.save(&mut rawdmi_temp)?;
-			let chunk_ztxt = match raw_dmi.chunk_ztxt {
-				Some(chunk) => chunk,
-				None => {
-					return Err(DmiError::Generic(String::from(
-						"Error loading icon: no zTXt chunk found.",
-					)))
+
+			let mut total_bytes = 45;
+			if let Some(chunk_plte) = &raw_dmi.chunk_plte {
+				total_bytes += chunk_plte.data.len() + 12
+			}
+			if let Some(other_chunks) = &raw_dmi.other_chunks {
+				for chunk in other_chunks {
+					total_bytes += chunk.data.len() + 12
 				}
+			}
+			for idat in &raw_dmi.chunks_idat {
+				total_bytes += idat.data.len() + 12;
+			}
+
+			// Reconstruct the PNG
+			let mut png_data = Vec::with_capacity(total_bytes);
+			png_data.extend_from_slice(&raw_dmi.header);
+			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.data_length);
+			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.chunk_type);
+			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.data);
+			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.crc);
+			if let Some(plte) = &raw_dmi.chunk_plte {
+				png_data.extend_from_slice(&plte.data_length);
+				png_data.extend_from_slice(&plte.chunk_type);
+				png_data.extend_from_slice(&plte.data);
+				png_data.extend_from_slice(&plte.crc);
+			}
+			if let Some(other_chunks) = &raw_dmi.other_chunks {
+				for chunk in other_chunks {
+					png_data.extend_from_slice(&chunk.data_length);
+					png_data.extend_from_slice(&chunk.chunk_type);
+					png_data.extend_from_slice(&chunk.data);
+					png_data.extend_from_slice(&chunk.crc);
+				}
+			}
+			for idat in &raw_dmi.chunks_idat {
+				png_data.extend_from_slice(&idat.data_length);
+				png_data.extend_from_slice(&idat.chunk_type);
+				png_data.extend_from_slice(&idat.data);
+				png_data.extend_from_slice(&idat.crc);
+			}
+			png_data.extend_from_slice(&raw_dmi.chunk_iend.data_length);
+			png_data.extend_from_slice(&raw_dmi.chunk_iend.chunk_type);
+			png_data.extend_from_slice(&raw_dmi.chunk_iend.crc);
+
+			let mut png_decoder = Decoder::new(std::io::Cursor::new(png_data));
+			png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
+			let mut png_reader = png_decoder.read_info()?;
+			let mut rgba_buf = vec![0u8; png_reader.output_buffer_size()];
+			let info = png_reader.next_frame(&mut rgba_buf)?;
+
+			// EXPAND and ALPHA do not expand grayscale images into RGBA. We can just do this manually.
+			match info.color_type {
+				ColorType::GrayscaleAlpha => {
+            if rgba_buf.len() as u32 != info.width * info.height * 2 {
+                return Err(DmiError::Generic(String::from("GrayscaleAlpha buffer length mismatch")));
+            }
+						let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+            for chunk in rgba_buf.chunks(2) {
+                let gray = chunk[0];
+                let alpha = chunk[1];
+                new_buf.push(gray);
+                new_buf.push(gray);
+                new_buf.push(gray);
+                new_buf.push(alpha);
+            }
+						rgba_buf = new_buf;
+        }
+        ColorType::Grayscale => {
+            if rgba_buf.len() as u32 != info.width * info.height {
+                return Err(DmiError::Generic(String::from("Grayscale buffer length mismatch")));
+            }
+						let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+            for gray in rgba_buf {
+                new_buf.push(gray);
+                new_buf.push(gray);
+                new_buf.push(gray);
+                new_buf.push(255);
+            }
+						rgba_buf = new_buf;
+        }
+				ColorType::Rgba => {}
+				_ => {
+					return Err(DmiError::Generic(format!("Unsupported ColorType (must be RGBA or convertible to RGBA): {:#?}", info.color_type)));
+				}
+			}
+
+			let dmi_meta = RawDmiMetadata {
+				chunk_ihdr: raw_dmi.chunk_ihdr,
+				chunk_ztxt: raw_dmi.chunk_ztxt.ok_or_else(|| {
+					DmiError::Generic(String::from("Error loading icon: no zTXt chunk found."))
+				})?,
 			};
-			(
-				Some(image::load_from_memory_with_format(
-					&rawdmi_temp,
-					image::ImageFormat::Png,
-				)?),
-				RawDmiMetadata {
-					chunk_ihdr: raw_dmi.chunk_ihdr,
-					chunk_ztxt,
-				},
-			)
+
+			(dmi_meta, Some(rgba_buf))
 		} else {
-			(None, RawDmi::load_meta(reader)?)
+			(RawDmi::load_meta(reader)?, None)
 		};
 
 		let chunk_ztxt = &dmi_meta.chunk_ztxt;
@@ -315,7 +391,7 @@ impl Icon {
 					"\tdirs" => dirs = Some(value.parse::<u8>()?),
 					"\tframes" => frames = Some(value.parse::<u32>()?),
 					"\tdelay" => {
-						let mut delay_vector = vec![];
+						let mut delay_vector = Vec::with_capacity(frames.unwrap_or(0) as usize);
 						let text_delays = value.split_terminator(',');
 						for text_entry in text_delays {
 							delay_vector.push(text_entry.parse::<f32>()?);
@@ -369,14 +445,32 @@ impl Icon {
 				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({max_possible_states}).")));
 			};
 
-			let mut images = vec![];
+			let mut images = Vec::with_capacity((frames * dirs as u32) as usize);
 
-			if let Some(full_image) = base_image.as_ref() {
-				for image_idx in index..(index + (frames * dirs as u32)) {
+			if let Some(rgba_bytes) = &rgba_bytes {
+				const RGBA_PIXEL_STRIDE: usize = 4;
+				let row_stride = img_width as usize * RGBA_PIXEL_STRIDE;
+				let expected_buffer_len = row_stride * (img_height as usize);
+				if rgba_bytes.len() != expected_buffer_len {
+					panic!("{} != {}", rgba_bytes.len(), expected_buffer_len);
+				}
+
+				for image_idx in index..next_index {
 					let x = (image_idx % width_in_states) * width;
-					//This operation rounds towards zero, truncating any fractional part of the exact result, essentially a floor() function.
 					let y = (image_idx / width_in_states) * height;
-					images.push(full_image.crop_imm(x, y, width, height));
+
+					let mut cropped =
+						Vec::with_capacity((width * height * RGBA_PIXEL_STRIDE as u32) as usize);
+					for row in y..(y + height) {
+						let start = (row as usize * row_stride) + (x as usize * RGBA_PIXEL_STRIDE);
+						let end = start + (width as usize * RGBA_PIXEL_STRIDE);
+						cropped.extend_from_slice(&rgba_bytes[start..end]);
+					}
+
+					let tile = image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, cropped)
+						.ok_or_else(|| DmiError::Generic("Failed to create image tile".to_string()))?;
+
+					images.push(tile);
 				}
 			}
 
@@ -593,7 +687,7 @@ pub struct IconState {
 	pub name: String,
 	pub dirs: u8,
 	pub frames: u32,
-	pub images: Vec<image::DynamicImage>,
+	pub images: Vec<image::RgbaImage>,
 	pub delay: Option<Vec<f32>>,
 	pub loop_flag: Looping,
 	pub rewind: bool,
@@ -605,7 +699,7 @@ pub struct IconState {
 impl IconState {
 	/// Gets a specific DynamicImage from `images`, given a dir and frame.
 	/// If the dir or frame is invalid, returns a DmiError.
-	pub fn get_image(&self, dir: &Dirs, frame: u32) -> Result<&DynamicImage, DmiError> {
+	pub fn get_image(&self, dir: &Dirs, frame: u32) -> Result<&RgbaImage, DmiError> {
 		if self.frames < frame {
 			return Err(DmiError::IconState(format!(
 				"Specified frame \"{frame}\" is larger than the number of frames ({}) for icon_state \"{}\"",
