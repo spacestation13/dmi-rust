@@ -68,7 +68,9 @@ fn parse_dmi_line(
 ) -> Result<(&str, String), DmiError> {
 	let line_split = line.split_once(" = ");
 	if line_split.is_none() {
-		return Err(DmiError::BlockEntry(format!("No value was found for line: '{line}' (must contain ' = ')!")));
+		return Err(DmiError::BlockEntry(format!(
+			"No value was found for line: '{line}' (must contain ' = ')!"
+		)));
 	}
 	let line_split = line_split.unwrap();
 	// Now we need to parse after the equals
@@ -78,10 +80,11 @@ fn parse_dmi_line(
 	// Flags
 	let mut quoted = false;
 	let mut escaped = false;
+	let mut used_quotes = false;
 
 	let value_bytes = line_split.1.as_bytes();
-	for char_idx in 0..num_chars {
-		let char: char = value_bytes[char_idx] as char;
+	for (char_idx, char) in value_bytes.iter().enumerate() {
+		let char = *char as char;
 		let escape_this_char = escaped;
 		escaped = false;
 		match char {
@@ -107,6 +110,7 @@ fn parse_dmi_line(
 						return Err(DmiError::BlockEntry(format!("Line with value '{line}' starts quotes after the first character in its value. This is not allowed.")));
 					}
 					quoted = !quoted;
+					used_quotes = true;
 					continue;
 				}
 			}
@@ -117,10 +121,10 @@ fn parse_dmi_line(
 			}
 			_ => {}
 		}
-		if allow_quotes && require_quotes && !quoted {
-			return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not quote all its contents!")));
-		}
 		post_equals.push(char);
+	}
+	if allow_quotes && require_quotes && !used_quotes {
+		return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not wrap its contents in quotes!")));
 	}
 	Ok((line_split.0, post_equals))
 }
