@@ -50,12 +50,17 @@ struct DmiHeaders {
 }
 
 /// Splits the line of a DMI entry into a key/value pair on the equals sign.
-/// Removes spaces or equals signs that are not inside quotes.
-/// Tabs are left intact only prior to the first equals sign, and only as the first character parsed.
-/// Removes quotes around values and escape characters for quotes inside the quotes.
 /// The second string cannot be empty (a value must exist), or a DmiError is returned.
 /// Only one set of quotes is allowed if allow_quotes is true, and it must wrap the entire value.
 /// If require_quotes is set, will error if there are not quotes around the value.
+/// 
+/// Other details about this function:
+/// 
+/// Keys have very little validation and are meant to be checked against a known value in most cases.
+/// Spaces are only allowed in the value if they are inside quotes or directly after the equals sign (where they are removed). 
+/// Tabs and equals signs are only allowed in the value if they are not inside quotes.
+/// Removes quotes around values and removes backslashes for quotes inside the quotes.
+/// Removes backslashes used to escape other backslashes.
 fn parse_dmi_line(
 	line: &str,
 	allow_quotes: bool,
