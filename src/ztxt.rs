@@ -85,8 +85,8 @@ impl RawZtxtChunk {
 		})
 	}
 
-	pub fn save<W: Write>(&self, writter: &mut W) -> Result<usize, error::DmiError> {
-		let bytes_written = writter.write(&self.data_length)?;
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, error::DmiError> {
+		let bytes_written = writer.write(&self.data_length)?;
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.data_length.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -94,7 +94,7 @@ impl RawZtxtChunk {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.chunk_type)?;
+		let bytes_written = writer.write(&self.chunk_type)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.chunk_type.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -102,7 +102,7 @@ impl RawZtxtChunk {
 			)));
 		};
 
-		let bytes_written = self.data.save(&mut *writter)?;
+		let bytes_written = self.data.save(&mut *writer)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.data_length) as usize {
 			return Err(error::DmiError::Generic(format!(
@@ -110,7 +110,7 @@ impl RawZtxtChunk {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.crc)?;
+		let bytes_written = writer.write(&self.crc)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.crc.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -238,8 +238,8 @@ impl RawZtxtData {
 		})
 	}
 
-	pub fn save<W: Write>(&self, writter: &mut W) -> Result<usize, error::DmiError> {
-		let bytes_written = writter.write(&self.keyword)?;
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, error::DmiError> {
+		let bytes_written = writer.write(&self.keyword)?;
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.keyword.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -247,7 +247,7 @@ impl RawZtxtData {
 			)));
 		};
 
-		let bytes_written = writter.write(&[self.null_separator])?;
+		let bytes_written = writer.write(&[self.null_separator])?;
 		total_bytes_written += bytes_written;
 		if bytes_written < 1 {
 			return Err(error::DmiError::Generic(format!(
@@ -255,7 +255,7 @@ impl RawZtxtData {
 			)));
 		};
 
-		let bytes_written = writter.write(&[self.compression_method])?;
+		let bytes_written = writer.write(&[self.compression_method])?;
 		total_bytes_written += bytes_written;
 		if bytes_written < 1 {
 			return Err(error::DmiError::Generic(format!(
@@ -263,7 +263,7 @@ impl RawZtxtData {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.compressed_text)?;
+		let bytes_written = writer.write(&self.compressed_text)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.compressed_text.len() {
 			return Err(error::DmiError::Generic(format!(

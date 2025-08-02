@@ -74,8 +74,8 @@ impl RawGenericChunk {
 		})
 	}
 
-	pub fn save<W: Write>(&self, writter: &mut W) -> Result<usize, error::DmiError> {
-		let bytes_written = writter.write(&self.data_length)?;
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, error::DmiError> {
+		let bytes_written = writer.write(&self.data_length)?;
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.data_length.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -83,7 +83,7 @@ impl RawGenericChunk {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.chunk_type)?;
+		let bytes_written = writer.write(&self.chunk_type)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.chunk_type.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -91,7 +91,7 @@ impl RawGenericChunk {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.data)?;
+		let bytes_written = writer.write(&self.data)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.data.len() {
 			return Err(error::DmiError::Generic(format!(
@@ -99,7 +99,7 @@ impl RawGenericChunk {
 			)));
 		};
 
-		let bytes_written = writter.write(&self.crc)?;
+		let bytes_written = writer.write(&self.crc)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.crc.len() {
 			return Err(error::DmiError::Generic(format!(
