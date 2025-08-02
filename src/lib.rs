@@ -230,8 +230,35 @@ impl RawDmi {
 		})
 	}
 
-	pub fn save<W: Write>(&self, mut writter: &mut W) -> Result<usize, error::DmiError> {
-		let bytes_written = writter.write(&self.header)?;
+	/// Calculates the size of a buffer needed to save this DMI with RawDmi::save.
+	pub fn output_buffer_size(&self, include_ztxt: bool) -> usize {
+		let mut total_bytes = 45;
+		if include_ztxt {
+			if let Some(chunk_ztxt) = &self.chunk_ztxt {
+				total_bytes += chunk_ztxt.data.keyword.len() + chunk_ztxt.data.compressed_text.len() + 14
+			}
+		}
+		if let Some(chunk_plte) = &self.chunk_plte {
+			total_bytes += chunk_plte.data.len() + 12
+		}
+		if let Some(other_chunks) = &self.other_chunks {
+			for chunk in other_chunks {
+				total_bytes += chunk.data.len() + 12
+			}
+		}
+		for idat in &self.chunks_idat {
+			total_bytes += idat.data.len() + 12;
+		}
+
+		total_bytes
+	}
+
+	pub fn save<W: Write>(
+		&self,
+		mut writer: &mut W,
+		include_ztxt: bool,
+	) -> Result<usize, error::DmiError> {
+		let bytes_written = writer.write(&self.header)?;
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < 8 {
 			return Err(error::DmiError::Generic(format!(
@@ -239,7 +266,7 @@ impl RawDmi {
 			)));
 		};
 
-		let bytes_written = self.chunk_ihdr.save(&mut writter)?;
+		let bytes_written = self.chunk_ihdr.save(&mut writer)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.chunk_ihdr.data_length) as usize + 12 {
 			return Err(error::DmiError::Generic(format!(
@@ -247,18 +274,20 @@ impl RawDmi {
 			)));
 		};
 
-		if let Some(chunk_ztxt) = &self.chunk_ztxt {
-			let bytes_written = chunk_ztxt.save(&mut writter)?;
-			total_bytes_written += bytes_written;
-			if bytes_written < u32::from_be_bytes(chunk_ztxt.data_length) as usize + 12 {
-				return Err(error::DmiError::Generic(format!(
-					"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
-				)));
+		if include_ztxt {
+			if let Some(chunk_ztxt) = &self.chunk_ztxt {
+				let bytes_written = chunk_ztxt.save(&mut writer)?;
+				total_bytes_written += bytes_written;
+				if bytes_written < u32::from_be_bytes(chunk_ztxt.data_length) as usize + 12 {
+					return Err(error::DmiError::Generic(format!(
+						"Failed to save DMI. Buffer unable to hold the data, only {total_bytes_written} bytes written."
+					)));
+				};
 			};
-		};
+		}
 
 		if let Some(chunk_plte) = &self.chunk_plte {
-			let bytes_written = chunk_plte.save(&mut writter)?;
+			let bytes_written = chunk_plte.save(&mut writer)?;
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk_plte.data_length) as usize + 12 {
 				return Err(error::DmiError::Generic(format!(
@@ -269,7 +298,7 @@ impl RawDmi {
 
 		if let Some(other_chunks) = &self.other_chunks {
 			for chunk in other_chunks {
-				let bytes_written = chunk.save(&mut writter)?;
+				let bytes_written = chunk.save(&mut writer)?;
 				total_bytes_written += bytes_written;
 				if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
 					return Err(error::DmiError::Generic(format!(
@@ -280,7 +309,7 @@ impl RawDmi {
 		}
 
 		for chunk in &self.chunks_idat {
-			let bytes_written = chunk.save(&mut writter)?;
+			let bytes_written = chunk.save(&mut writer)?;
 			total_bytes_written += bytes_written;
 			if bytes_written < u32::from_be_bytes(chunk.data_length) as usize + 12 {
 				return Err(error::DmiError::Generic(format!(
@@ -289,7 +318,7 @@ impl RawDmi {
 			};
 		}
 
-		let bytes_written = self.chunk_iend.save(&mut writter)?;
+		let bytes_written = self.chunk_iend.save(&mut writer)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < u32::from_be_bytes(self.chunk_iend.data_length) as usize + 12 {
 			return Err(error::DmiError::Generic(format!(

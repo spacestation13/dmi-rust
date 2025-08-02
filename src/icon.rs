@@ -212,51 +212,13 @@ impl Icon {
 		let (dmi_meta, rgba_bytes) = if load_images {
 			let raw_dmi = RawDmi::load(reader)?;
 
-			let mut total_bytes = 45;
-			if let Some(chunk_plte) = &raw_dmi.chunk_plte {
-				total_bytes += chunk_plte.data.len() + 12
-			}
-			if let Some(other_chunks) = &raw_dmi.other_chunks {
-				for chunk in other_chunks {
-					total_bytes += chunk.data.len() + 12
-				}
-			}
-			for idat in &raw_dmi.chunks_idat {
-				total_bytes += idat.data.len() + 12;
-			}
-
-			// Reconstruct the PNG
-			let mut png_data = Vec::with_capacity(total_bytes);
-			png_data.extend_from_slice(&raw_dmi.header);
-			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.data_length);
-			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.chunk_type);
-			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.data);
-			png_data.extend_from_slice(&raw_dmi.chunk_ihdr.crc);
-			if let Some(plte) = &raw_dmi.chunk_plte {
-				png_data.extend_from_slice(&plte.data_length);
-				png_data.extend_from_slice(&plte.chunk_type);
-				png_data.extend_from_slice(&plte.data);
-				png_data.extend_from_slice(&plte.crc);
-			}
-			if let Some(other_chunks) = &raw_dmi.other_chunks {
-				for chunk in other_chunks {
-					png_data.extend_from_slice(&chunk.data_length);
-					png_data.extend_from_slice(&chunk.chunk_type);
-					png_data.extend_from_slice(&chunk.data);
-					png_data.extend_from_slice(&chunk.crc);
-				}
-			}
-			for idat in &raw_dmi.chunks_idat {
-				png_data.extend_from_slice(&idat.data_length);
-				png_data.extend_from_slice(&idat.chunk_type);
-				png_data.extend_from_slice(&idat.data);
-				png_data.extend_from_slice(&idat.crc);
-			}
-			png_data.extend_from_slice(&raw_dmi.chunk_iend.data_length);
-			png_data.extend_from_slice(&raw_dmi.chunk_iend.chunk_type);
-			png_data.extend_from_slice(&raw_dmi.chunk_iend.crc);
+			// Reconstruct the full PNG from memory. Preallocating the size saves a lot of compute here.
+			let mut png_data = Vec::with_capacity(raw_dmi.output_buffer_size(false));
+			raw_dmi.save(&mut png_data, false)?;
 
 			let mut png_decoder = Decoder::new(std::io::Cursor::new(png_data));
+			// this will convert RGB->RGBA and increase bit depth to 8, interpret tRNS chunks, interpret PLTE chunks
+			// notably does not convert greyscale color types to RGB.
 			png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
 			let mut png_reader = png_decoder.read_info()?;
 			let mut rgba_buf = vec![0u8; png_reader.output_buffer_size()];
@@ -336,7 +298,7 @@ impl Icon {
 		let img_height = u32::from_be_bytes([ihdr_data[4], ihdr_data[5], ihdr_data[6], ihdr_data[7]]);
 
 		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
-			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Missmatch with metadata width ({width}) / height ({height}).")));
+			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Mismatch with metadata width ({width}) / height ({height}).")));
 		};
 
 		let width_in_states = img_width / width;
@@ -505,7 +467,7 @@ impl Icon {
 		})
 	}
 
-	pub fn save<W: Write>(&self, mut writter: &mut W) -> Result<usize, DmiError> {
+	pub fn save<W: Write>(&self, mut writer: &mut W) -> Result<usize, DmiError> {
 		let mut sprites = vec![];
 		let mut signature = format!(
 			"# BEGIN DMI\nversion = {}\n\twidth = {}\n\theight = {}\n",
@@ -598,7 +560,7 @@ impl Icon {
 
 		new_dmi.chunk_ztxt = Some(new_ztxt);
 
-		new_dmi.save(&mut writter)
+		new_dmi.save(&mut writer, true)
 	}
 }
 
