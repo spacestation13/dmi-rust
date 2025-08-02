@@ -30,6 +30,25 @@ pub struct RawDmiMetadata {
 	pub chunk_ztxt: ztxt::RawZtxtChunk,
 }
 
+fn ensure_buffered_bytes<R: Read>(
+	buffered_bytes: &mut Cursor<Vec<u8>>,
+	source_reader: &mut R,
+	source_amount_read: &mut usize,
+	additional_length_required: usize,
+) -> Result<(), error::DmiError> {
+	let original_position = buffered_bytes.position();
+	if original_position + additional_length_required as u64 > *source_amount_read as u64 {
+		let mut new_bytes = vec![0u8; additional_length_required];
+		source_reader.read_exact(&mut new_bytes)?;
+		// Append all the new bytes to our cursor and go back to our old spot
+		buffered_bytes.seek_relative(*source_amount_read as i64 - original_position as i64)?;
+		buffered_bytes.write_all(&new_bytes)?;
+		*source_amount_read += new_bytes.len();
+		buffered_bytes.seek_relative(original_position as i64 - *source_amount_read as i64)?;
+	}
+	Ok(())
+}
+
 impl RawDmi {
 	pub fn new() -> RawDmi {
 		RawDmi {
@@ -163,58 +182,64 @@ impl RawDmi {
 		let mut chunk_ztxt = None;
 
 		loop {
-			// Read len
-			let mut chunk_len_be: [u8; 4] = [0u8; 4];
-			buffered_dmi_bytes.read_exact(&mut chunk_len_be)?;
-			let chunk_len = u32::from_be_bytes(chunk_len_be) as usize;
+			// Read len[u8; 4] + header[u8; 4]
+			let mut chunk_header_full: [u8; 8] = [0u8; 8];
+			buffered_dmi_bytes.read_exact(&mut chunk_header_full)?;
 
-			// Create vec for full chunk data
-			let mut chunk_full: Vec<u8> = Vec::with_capacity(chunk_len + 12);
-			chunk_full.extend_from_slice(&chunk_len_be);
+			let chunk_len = u32::from_be_bytes([
+				chunk_header_full[0],
+				chunk_header_full[1],
+				chunk_header_full[2],
+				chunk_header_full[3],
+			]) as usize;
 
-			// Read header into full chunk data
-			let mut chunk_header = [0u8; 4];
-			buffered_dmi_bytes.read_exact(&mut chunk_header)?;
-			chunk_full.extend_from_slice(&chunk_header);
+			// Read header
+			let chunk_header_type = &chunk_header_full[4..8];
 
 			// If we encounter IDAT or IEND we can just break because the zTXt header aint happening
-			if &chunk_header == b"IDAT" || &chunk_header == b"IEND" {
+			if chunk_header_type == b"IDAT" || chunk_header_type == b"IEND" {
 				break;
 			}
 
-			// We will overread the file's buffer.
-			let original_position = buffered_dmi_bytes.position();
-			if original_position + chunk_len as u64 + 12 > dmi_bytes_read as u64 {
+			// Skip non-zTXt chunks
+			if chunk_header_type != b"zTXt" {
+				// We will overread the file's buffer on our seek.
 				// Read the remainder of the chunk + 4 bytes for CRC + 8 bytes for the next header.
 				// There will always be a next header because IEND headers break before this check.
-				let mut new_dmi_bytes = vec![0u8; chunk_len + 12];
-				reader.read_exact(&mut new_dmi_bytes)?;
-				// Append all the new bytes to our cursor and go back to our old spot
-				buffered_dmi_bytes.seek_relative(dmi_bytes_read as i64 - original_position as i64)?;
-				buffered_dmi_bytes.write_all(&new_dmi_bytes)?;
-				dmi_bytes_read += new_dmi_bytes.len();
-				buffered_dmi_bytes.seek_relative(original_position as i64 - dmi_bytes_read as i64)?;
-			}
-
-			// Skip non-zTXt chunks
-			if &chunk_header != b"zTXt" {
+				ensure_buffered_bytes(
+					&mut buffered_dmi_bytes,
+					&mut reader,
+					&mut dmi_bytes_read,
+					chunk_len + 12,
+				)?;
 				buffered_dmi_bytes.seek_relative((chunk_len + 4) as i64)?;
 				continue;
 			}
 
-			// Read actual chunk data and append
-			let mut chunk_data = vec![0; chunk_len];
+			// Make sure we have enough bytes to finish the zTXt chunk and nothing else.
+			ensure_buffered_bytes(
+				&mut buffered_dmi_bytes,
+				&mut reader,
+				&mut dmi_bytes_read,
+				chunk_len + 4,
+			)?;
+
+			// Create vec for full chunk data
+			let mut chunk_full: Vec<u8> = Vec::with_capacity(chunk_len + 12);
+
+			// Fill it up with the data we already have
+			chunk_full.extend_from_slice(&chunk_header_full);
+
+			// Read actual chunk data + CRC and append
+			let mut chunk_data = vec![0; chunk_len + 4];
 			buffered_dmi_bytes.read_exact(&mut chunk_data)?;
 			chunk_full.extend_from_slice(&chunk_data);
-
-			// Read CRC into full chunk data
-			let mut chunk_crc = [0u8; 4];
-			buffered_dmi_bytes.read_exact(&mut chunk_crc)?;
-			chunk_full.extend_from_slice(&chunk_crc);
 
 			let raw_chunk = chunk::RawGenericChunk::load(&mut &*chunk_full)?;
 
 			chunk_ztxt = Some(ztxt::RawZtxtChunk::try_from(raw_chunk)?);
+			// We got all we need, let's gooo
+			break;
 		}
 
 		if chunk_ztxt.is_none() {
