@@ -1,2 +1,3 @@
 /target
 Cargo.lock
+tests/resources/save_test.dmi

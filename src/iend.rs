@@ -45,8 +45,8 @@ impl RawIendChunk {
 		];
 		if data_length != default_iend_chunk.data_length {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to load RawIendChunk from reader. Lengh field value: {:#?}. Expected: {:#?}.",
-				data_length, default_iend_chunk.data_length
+				"Failed to load RawIendChunk from reader. Lengh field value: {data_length:#?}. Expected: {:#?}.",
+				default_iend_chunk.data_length
 			)));
 		}
 
@@ -58,8 +58,8 @@ impl RawIendChunk {
 		];
 		if chunk_type != default_iend_chunk.chunk_type {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to load RawIendChunk from reader. Chunk type: {:#?}. Expected {:#?}.",
-				chunk_type, default_iend_chunk.chunk_type
+				"Failed to load RawIendChunk from reader. Chunk type: {chunk_type:#?}. Expected {:#?}.",
+				default_iend_chunk.chunk_type
 			)));
 		}
 
@@ -71,39 +71,36 @@ impl RawIendChunk {
 		];
 		if crc != default_iend_chunk.crc {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to load RawIendChunk from reader. CRC: {:#?}. Expected {:#?}.",
-				crc, default_iend_chunk.crc
+				"Failed to load RawIendChunk from reader. CRC: {crc:#?}. Expected {:#?}.",
+				default_iend_chunk.crc
 			)));
 		}
 
 		Ok(default_iend_chunk)
 	}
 
-	pub fn save<W: Write>(&self, writter: &mut W) -> Result<usize, error::DmiError> {
-		let bytes_written = writter.write(&self.data_length)?;
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, error::DmiError> {
+		let bytes_written = writer.write(&self.data_length)?;
 		let mut total_bytes_written = bytes_written;
 		if bytes_written < self.data_length.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save IEND chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save IEND chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
-		let bytes_written = writter.write(&self.chunk_type)?;
+		let bytes_written = writer.write(&self.chunk_type)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.chunk_type.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save IEND chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save IEND chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
-		let bytes_written = writter.write(&self.crc)?;
+		let bytes_written = writer.write(&self.crc)?;
 		total_bytes_written += bytes_written;
 		if bytes_written < self.crc.len() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to save IEND chunk. Buffer unable to hold the data, only {} bytes written.",
-				total_bytes_written
+				"Failed to save IEND chunk. Buffer unable to hold the data, only {total_bytes_written} bytes written."
 			)));
 		};
 
@@ -129,8 +126,7 @@ impl TryFrom<chunk::RawGenericChunk> for RawIendChunk {
 	fn try_from(raw_generic_chunk: chunk::RawGenericChunk) -> Result<Self, Self::Error> {
 		if !raw_generic_chunk.data.is_empty() {
 			return Err(error::DmiError::Generic(format!(
-				"Failed to convert RawGenericChunk into RawIendChunk. Non-empty data field. Chunk: {:#?}.",
-				raw_generic_chunk
+				"Failed to convert RawGenericChunk into RawIendChunk. Non-empty data field. Chunk: {raw_generic_chunk:#?}."
 			)));
 		};
 
