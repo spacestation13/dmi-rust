@@ -221,7 +221,7 @@ impl Icon {
 			// notably does not convert greyscale color types to RGB.
 			png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
 			let mut png_reader = png_decoder.read_info()?;
-			let mut rgba_buf = vec![0u8; png_reader.output_buffer_size()];
+			let mut rgba_buf = vec![0u8; png_reader.output_buffer_size().unwrap_or_default()];
 			let info = png_reader.next_frame(&mut rgba_buf)?;
 
 			// EXPAND and ALPHA do not expand grayscale images into RGBA. We can just do this manually.

@@ -16,5 +16,5 @@ crc32fast = "1"
 deflate = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 inflate = "0.4"
-png = "0.17.16"
+png = "0.18.0"
 thiserror = "2"
