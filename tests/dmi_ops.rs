@@ -66,8 +66,8 @@ fn assert_default_state(state: &IconState, name: &'static str) {
 	assert_eq!(state.frames, 1);
 	assert_eq!(state.delay, None);
 	assert_eq!(state.loop_flag, Looping::Indefinitely);
-	assert_eq!(state.rewind, false);
-	assert_eq!(state.movement, false);
+	assert!(!state.rewind);
+	assert!(!state.movement);
 	assert_eq!(state.hotspot, None);
 	assert_eq!(state.unknown_settings, None);
 }
