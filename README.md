@@ -11,3 +11,4 @@ A DMI library for [BYOND] written in Rust. Provides helpers to manipulate and pr
 * [dmi-duplicate-state-checker](https://github.com/spacestation13/dmi-duplicate-state-checker): A tool for checking if DMIs have duplicate icon_states
 * [canvas-resizer](https://github.com/Rohesie/canvas-resizer/): A tool to resize DMI canvases
 * [icon-merger](https://github.com/Rohesie/icon-merger): A tool to merge multiple compatible dmis into a one
+* [iconforge](https://github.com/itsmeow/iconforge-rs): A library for performing DMI transformations, greyscale rendering, spritesheet building, and blending in parallel.
