@@ -297,7 +297,11 @@ impl Icon {
 			u32::from_be_bytes([ihdr_data[0], ihdr_data[1], ihdr_data[2], ihdr_data[3]]);
 		let img_height = u32::from_be_bytes([ihdr_data[4], ihdr_data[5], ihdr_data[6], ihdr_data[7]]);
 
-		if img_width == 0 || img_height == 0 || img_width % width != 0 || img_height % height != 0 {
+		if img_width == 0
+			|| img_height == 0
+			|| !img_width.is_multiple_of(width)
+			|| !img_height.is_multiple_of(height)
+		{
 			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Mismatch with metadata width ({width}) / height ({height}).")));
 		};
 
