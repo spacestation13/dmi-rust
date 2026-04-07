@@ -691,7 +691,7 @@ impl IconState {
 		}
 
 		let image_idx = match dir_to_dmi_index(dir) {
-			Some(idx) => (idx + 1) * frame as usize - 1,
+			Some(idx) => ((frame as usize - 1) * self.dirs as usize) + idx,
 			None => {
 				return Err(DmiError::IconState(format!(
 					"Dir specified {dir} is not a valid dir within DMI ordering! (icon_state: {})",
