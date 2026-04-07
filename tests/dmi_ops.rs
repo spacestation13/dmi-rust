@@ -113,13 +113,13 @@ fn dirs_iter_test() {
 	for (i, dir) in dmi::dirs::CARDINAL_DIRS.iter().enumerate() {
 		let img = state
 			.get_image(dir, target_frame)
-			.expect(&format!("Failed to get image for dir {dir:?}"));
+			.unwrap_or_else(|_| panic!("Failed to get image for dir {dir:?}"));
 		dirs_extracted.push(img.clone());
 
 		let ref_path = dirs_ref_dir.join(format!("dir_{i}.png"));
 
 		let saved_image = ImageReader::open(&ref_path)
-			.expect(&format!("Missing reference dir image: {ref_path:?}"))
+			.unwrap_or_else(|_| panic!("Missing reference dir image: {ref_path:?}"))
 			.decode()
 			.expect("Failed to decode reference dir image")
 			.to_rgba8();
