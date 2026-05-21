@@ -1,5 +1,6 @@
 use dmi::dirs::Dirs;
-use dmi::icon::{DmiVersion, Icon, IconState, Looping};
+use dmi::icon::{DmiVersion, Icon};
+use dmi::iconstate::{IconState, Looping};
 use image::{ImageReader, RgbaImage};
 use std::fs;
 use std::path::{Path, PathBuf};
