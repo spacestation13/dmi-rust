@@ -1,11 +1,10 @@
-use crate::dirs::Dirs ;
+use crate::dirs::Dirs;
 use crate::error::DmiError;
 use crate::iconstate::{Hotspot, IconState, Looping};
-use image::imageops;
 use png::{ColorType, Decoder, Encoder, Transformations};
 use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 use std::io::prelude::*;
-use std::io::Cursor;
 
 #[derive(Clone, Default, PartialEq, Debug)]
 /// A DMI Icon, which is a collection of [IconState]s.
@@ -208,10 +207,12 @@ impl Icon {
 	fn load_internal<R: Read + Seek>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
 		let buf_reader = std::io::BufReader::new(reader);
 		let mut png_decoder = Decoder::new(buf_reader);
-		// EXPAND: converts indexed/low-bit-depth to 8-bit, interprets tRNS/PLTE
-		// ALPHA: ensures an alpha channel exists
-		// Does NOT convert grayscale to RGB.
-		png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
+		if load_images {
+			// EXPAND: converts indexed/low-bit-depth to 8-bit, interprets tRNS/PLTE
+			// ALPHA: ensures an alpha channel exists
+			// Does NOT convert grayscale to RGB.
+			png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
+		}
 		let mut png_reader = png_decoder.read_info()?;
 
 		// Extract metadata from info before reading frame data
@@ -468,7 +469,7 @@ impl Icon {
 		})
 	}
 
-	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, DmiError> {
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<(), DmiError> {
 		let mut sprites = vec![];
 		let mut signature = format!(
 			"# BEGIN DMI\nversion = {}\n\twidth = {}\n\theight = {}\n",
@@ -493,8 +494,12 @@ impl Icon {
 						if delay.len() as u32 != icon_state.frames {
 							return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({delay:3?}). Name: \"{}\".", icon_state.frames, icon_state.name)))
 						};
-						let delay: Vec<String>= delay.iter().map(|&c| c.to_string()).collect();
-						signature.push_str(&format!("\tdelay = {}\n", delay.join(",")));
+						signature.push_str("\tdelay = ");
+						for (i, &d) in delay.iter().enumerate() {
+							if i > 0 { signature.push(','); }
+							write!(signature, "{d}").unwrap();
+						}
+						signature.push('\n');
 					},
 					None => return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
 				};
@@ -536,35 +541,37 @@ impl Icon {
 		let png_width = cell_width * self.width;
 		let png_height = cell_height * self.height;
 
-		// Compose the sprite sheet
-		let mut new_png = image::DynamicImage::new_rgba8(png_width, png_height);
-		for (index, sprite) in sprites.iter().enumerate() {
-			let index = index as u32;
-			imageops::replace(
-				&mut new_png,
-				*sprite,
-				(self.width * (index % cell_width)).into(),
-				(self.height * (index / cell_width)).into(),
-			);
+		// Compose the sprite sheet directly into a flat RGBA8 buffer, one row at a time.
+		// This avoids the overhead of DynamicImage and imageops::replace's generic pixel machinery.
+		const RGBA_STRIDE: usize = 4;
+		let row_stride = png_width as usize * RGBA_STRIDE;
+		let mut sheet = vec![0u8; row_stride * png_height as usize];
+		for (idx, sprite) in sprites.iter().enumerate() {
+			let idx = idx as u32;
+			let dst_x = (self.width * (idx % cell_width)) as usize;
+			let dst_y = (self.height * (idx / cell_width)) as usize;
+			let sprite_data = sprite.as_raw();
+			let sprite_row_len = self.width as usize * RGBA_STRIDE;
+			for row in 0..self.height as usize {
+				let dst_start = (dst_y + row) * row_stride + dst_x * RGBA_STRIDE;
+				let src_start = row * sprite_row_len;
+				sheet[dst_start..dst_start + sprite_row_len]
+					.copy_from_slice(&sprite_data[src_start..src_start + sprite_row_len]);
+			}
 		}
 
-		// Encode
-		let mut png_buf = Cursor::new(Vec::new());
-		{
-			let mut encoder = Encoder::new(&mut png_buf, png_width, png_height);
-			encoder.set_color(ColorType::Rgba);
-			encoder.set_depth(png::BitDepth::Eight);
-			encoder.set_compression(png::Compression::Balanced);
-			encoder.set_filter(png::Filter::Adaptive);
-			encoder.add_ztxt_chunk("Description".to_string(), signature)?;
-			let mut png_writer = encoder.write_header()?;
-			png_writer.write_image_data(new_png.as_bytes())?;
-			png_writer.finish()?;
-		}
+		// Encode directly to the writer — no intermediate buffer needed.
+		let mut encoder = Encoder::new(writer, png_width, png_height);
+		encoder.set_color(ColorType::Rgba);
+		encoder.set_depth(png::BitDepth::Eight);
+		encoder.set_compression(png::Compression::Balanced);
+		encoder.set_filter(png::Filter::Adaptive);
+		encoder.add_ztxt_chunk("Description".to_string(), signature)?;
+		let mut png_writer = encoder.write_header()?;
+		png_writer.write_image_data(&sheet)?;
+		png_writer.finish()?;
 
-		let png_bytes = png_buf.into_inner();
-		writer.write_all(&png_bytes)?;
-		Ok(png_bytes.len())
+		Ok(())
 	}
 }
 
