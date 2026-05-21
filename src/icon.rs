@@ -576,7 +576,7 @@ impl Icon {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct DmiVersion(String);
+pub struct DmiVersion(pub String);
 
 impl Default for DmiVersion {
 	fn default() -> Self {

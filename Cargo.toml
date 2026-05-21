@@ -15,3 +15,14 @@ bitflags = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }
 png = "0.18.1"
 thiserror = "2"
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "save_perf"
+harness = false
+
+[[bench]]
+name = "load_perf"
+harness = false
