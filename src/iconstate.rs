@@ -2,7 +2,11 @@ use std::{collections::HashMap, num::NonZeroU32};
 
 use image::RgbaImage;
 
-use crate::{dirs::{ALL_DIRS, CARDINAL_DIRS, Dirs}, error::DmiError, icon::dir_to_dmi_index};
+use crate::{
+	dirs::{ALL_DIRS, CARDINAL_DIRS, Dirs},
+	error::DmiError,
+	icon::dir_to_dmi_index,
+};
 
 /// Represents the Looping flag in an [IconState], which is used to determine how to loop an
 /// animated [IconState]
@@ -140,7 +144,10 @@ impl IconState {
 			Some(image) => Ok(image),
 			None => Err(DmiError::IconState(format!(
 				"Out of bounds index {image_idx} in icon_state \"{}\" (images len: {} dirs: {}, frames: {} - dir: {dir}, frame: {frame})",
-				self.name, self.images.len(), self.dirs, self.frames
+				self.name,
+				self.images.len(),
+				self.dirs,
+				self.frames
 			))),
 		}
 	}

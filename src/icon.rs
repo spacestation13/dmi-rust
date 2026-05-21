@@ -100,13 +100,19 @@ fn parse_dmi_line(
 			}
 			'"' => {
 				if !allow_quotes {
-					return Err(DmiError::Generic(format!("Quote found in line with value '{line}' after first equals where they are not allowed.")));
+					return Err(DmiError::Generic(format!(
+						"Quote found in line with value '{line}' after first equals where they are not allowed."
+					)));
 				}
 				if !escape_this_char {
 					if quoted && char_idx + 1 != num_chars {
-						return Err(DmiError::BlockEntry(format!("Line with value '{line}' ends quotes prior to the last character on the line. This is not allowed.")));
+						return Err(DmiError::BlockEntry(format!(
+							"Line with value '{line}' ends quotes prior to the last character on the line. This is not allowed."
+						)));
 					} else if !quoted && !post_equals.is_empty() {
-						return Err(DmiError::BlockEntry(format!("Line with value '{line}' starts quotes after the first character in its value. This is not allowed.")));
+						return Err(DmiError::BlockEntry(format!(
+							"Line with value '{line}' starts quotes after the first character in its value. This is not allowed."
+						)));
 					}
 					quoted = !quoted;
 					used_quotes = true;
@@ -114,14 +120,18 @@ fn parse_dmi_line(
 				}
 			}
 			'\t' | '=' | ' ' if !quoted => {
-				return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
+				return Err(DmiError::BlockEntry(format!(
+					"Invalid character {char} found in line with value '{line}' after first equals without quotes."
+				)));
 			}
 			_ => {}
 		}
 		post_equals.push(char);
 	}
 	if allow_quotes && require_quotes && !used_quotes {
-		return Err(DmiError::Generic(format!("Line with value '{line}' is required to have quotes after the equals sign, but does not wrap its contents in quotes!")));
+		return Err(DmiError::Generic(format!(
+			"Line with value '{line}' is required to have quotes after the equals sign, but does not wrap its contents in quotes!"
+		)));
 	}
 	Ok((line_split.0, post_equals))
 }
@@ -141,7 +151,7 @@ fn read_dmi_headers(
 		None => {
 			return Err(DmiError::Generic(String::from(
 				"Error loading icon: no version header found.",
-			)))
+			)));
 		}
 	};
 	let (key, value) = parse_dmi_line(current_line, false, false)?;
@@ -160,7 +170,7 @@ fn read_dmi_headers(
 			None => {
 				return Err(DmiError::Generic(String::from(
 					"Error loading icon: DMI definition abruptly ends.",
-				)))
+				)));
 			}
 		};
 		let (key, value) = parse_dmi_line(current_line, false, false)?;
@@ -232,9 +242,7 @@ impl Icon {
 		};
 
 		let decompressed_text = description_chunk.get_text().map_err(|e| {
-			DmiError::Generic(format!(
-				"Error decompressing zTXt 'Description' chunk: {e}"
-			))
+			DmiError::Generic(format!("Error decompressing zTXt 'Description' chunk: {e}"))
 		})?;
 
 		let mut decompressed_lines = decompressed_text.lines().peekable();
@@ -259,8 +267,7 @@ impl Icon {
 							"GrayscaleAlpha buffer length mismatch",
 						)));
 					}
-					let mut new_buf =
-						Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
+					let mut new_buf = Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
 					for chunk in rgba_buf.chunks(2) {
 						let gray = chunk[0];
 						let alpha = chunk[1];
@@ -275,8 +282,7 @@ impl Icon {
 							"Grayscale buffer length mismatch",
 						)));
 					}
-					let mut new_buf =
-						Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
+					let mut new_buf = Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
 					for gray in rgba_buf {
 						new_buf.extend_from_slice(&[gray, gray, gray, 255]);
 					}
@@ -300,7 +306,9 @@ impl Icon {
 			|| !img_width.is_multiple_of(width)
 			|| !img_height.is_multiple_of(height)
 		{
-			return Err(DmiError::Generic(format!("Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Mismatch with metadata width ({width}) / height ({height}).")));
+			return Err(DmiError::Generic(format!(
+				"Error loading icon: invalid image width ({img_width}) / height ({img_height}) values. Mismatch with metadata width ({width}) / height ({height})."
+			)));
 		};
 
 		let width_in_states = img_width / width;
@@ -314,7 +322,7 @@ impl Icon {
 			None => {
 				return Err(DmiError::Generic(
 					"Error loading icon: no DMI trailer nor states found.".to_string(),
-				))
+				));
 			}
 		};
 
@@ -349,7 +357,7 @@ impl Icon {
 					None => {
 						return Err(DmiError::Generic(
 							"Error loading icon: no DMI trailer found.".to_string(),
-						))
+						));
 					}
 				};
 
@@ -413,7 +421,9 @@ impl Icon {
 
 			let next_index = index + (dirs as u32 * frames);
 			if next_index > max_possible_states {
-				return Err(DmiError::Generic(format!("Error loading icon: metadata settings exceeded the maximum number of states possible ({max_possible_states}).")));
+				return Err(DmiError::Generic(format!(
+					"Error loading icon: metadata settings exceeded the maximum number of states possible ({max_possible_states})."
+				)));
 			};
 
 			let mut images = Vec::with_capacity((frames * dirs as u32) as usize);
@@ -478,7 +488,13 @@ impl Icon {
 
 		for icon_state in &self.states {
 			if icon_state.images.len() as u32 != icon_state.dirs as u32 * icon_state.frames {
-				return Err(DmiError::Generic(format!("Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".", icon_state.images.len(), icon_state.dirs, icon_state.frames, icon_state.name)));
+				return Err(DmiError::Generic(format!(
+					"Error saving Icon: number of images ({}) differs from the stated metadata. Dirs: {}. Frames: {}. Name: \"{}\".",
+					icon_state.images.len(),
+					icon_state.dirs,
+					icon_state.frames,
+					icon_state.name
+				)));
 			};
 
 			signature.push_str(&format!(
@@ -492,16 +508,26 @@ impl Icon {
 				match &icon_state.delay {
 					Some(delay) => {
 						if delay.len() as u32 != icon_state.frames {
-							return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) differs from the delay entry ({delay:3?}). Name: \"{}\".", icon_state.frames, icon_state.name)))
+							return Err(DmiError::Generic(format!(
+								"Error saving Icon: number of frames ({}) differs from the delay entry ({delay:3?}). Name: \"{}\".",
+								icon_state.frames, icon_state.name
+							)));
 						};
 						signature.push_str("\tdelay = ");
 						for (i, &d) in delay.iter().enumerate() {
-							if i > 0 { signature.push(','); }
+							if i > 0 {
+								signature.push(',');
+							}
 							write!(signature, "{d}").unwrap();
 						}
 						signature.push('\n');
-					},
-					None => return Err(DmiError::Generic(format!("Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".", icon_state.frames, icon_state.name)))
+					}
+					None => {
+						return Err(DmiError::Generic(format!(
+							"Error saving Icon: number of frames ({}) larger than one without a delay entry in icon state of name \"{}\".",
+							icon_state.frames, icon_state.name
+						)));
+					}
 				};
 				if let Looping::NTimes(flag) = icon_state.loop_flag {
 					signature.push_str(&format!("\tloop = {flag}\n"))
