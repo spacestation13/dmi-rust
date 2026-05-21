@@ -1,8 +1,7 @@
 use crate::dirs::{Dirs, ALL_DIRS, CARDINAL_DIRS};
-use crate::{error::DmiError, ztxt, RawDmi, RawDmiMetadata};
-use ::png::{ColorType, Decoder, Transformations};
-use image::codecs::png;
+use crate::error::DmiError;
 use image::{imageops, RgbaImage};
+use png::{ColorType, Decoder, Encoder, Transformations};
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -115,10 +114,8 @@ fn parse_dmi_line(
 					continue;
 				}
 			}
-			'\t' | '=' | ' ' => {
-				if !quoted {
-					return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
-				}
+			'\t' | '=' | ' ' if !quoted => {
+				return Err(DmiError::BlockEntry(format!("Invalid character {char} found in line with value '{line}' after first equals without quotes.")));
 			}
 			_ => {}
 		}
@@ -209,93 +206,93 @@ impl Icon {
 	}
 
 	fn load_internal<R: Read + Seek>(reader: R, load_images: bool) -> Result<Icon, DmiError> {
-		let (dmi_meta, rgba_bytes) = if load_images {
-			let raw_dmi = RawDmi::load(reader)?;
+		let buf_reader = std::io::BufReader::new(reader);
+		let mut png_decoder = Decoder::new(buf_reader);
+		// EXPAND: converts indexed/low-bit-depth to 8-bit, interprets tRNS/PLTE
+		// ALPHA: ensures an alpha channel exists
+		// Does NOT convert grayscale to RGB.
+		png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
+		let mut png_reader = png_decoder.read_info()?;
 
-			// Reconstruct the full PNG from memory. Preallocating the size saves a lot of compute here.
-			let mut png_data = Vec::with_capacity(raw_dmi.output_buffer_size(false));
-			raw_dmi.save(&mut png_data, false)?;
+		// Extract metadata from info before reading frame data
+		let (img_width, img_height, description_chunk) = {
+			let info = png_reader.info();
+			let ztxt = info
+				.compressed_latin1_text
+				.iter()
+				.find(|chunk| chunk.keyword == "Description")
+				.ok_or_else(|| {
+					DmiError::Generic(String::from(
+						"Error loading icon: no zTXt 'Description' chunk found.",
+					))
+				})?
+				.clone();
+			(info.width, info.height, ztxt)
+		};
 
-			let mut png_decoder = Decoder::new(std::io::Cursor::new(png_data));
-			// this will convert RGB->RGBA and increase bit depth to 8, interpret tRNS chunks, interpret PLTE chunks
-			// notably does not convert greyscale color types to RGB.
-			png_decoder.set_transformations(Transformations::EXPAND | Transformations::ALPHA);
-			let mut png_reader = png_decoder.read_info()?;
+		let decompressed_text = description_chunk.get_text().map_err(|e| {
+			DmiError::Generic(format!(
+				"Error decompressing zTXt 'Description' chunk: {e}"
+			))
+		})?;
+
+		let mut decompressed_lines = decompressed_text.lines().peekable();
+		let dmi_headers = read_dmi_headers(&mut decompressed_lines)?;
+		let version = dmi_headers.version;
+
+		// DMI defaults to 32x32 if width/height not specified
+		let width = dmi_headers.width.unwrap_or(32);
+		let height = dmi_headers.height.unwrap_or(32);
+
+		// Read pixel data if requested
+		let rgba_bytes = if load_images {
 			let mut rgba_buf = vec![0u8; png_reader.output_buffer_size().unwrap_or_default()];
-			let info = png_reader.next_frame(&mut rgba_buf)?;
+			let frame_info = png_reader.next_frame(&mut rgba_buf)?;
 
 			// EXPAND and ALPHA do not expand grayscale images into RGBA. We can just do this manually.
-			match info.color_type {
+			match frame_info.color_type {
 				ColorType::GrayscaleAlpha => {
-					if rgba_buf.len() as u32 != info.width * info.height * 2 {
+					let expected = frame_info.width * frame_info.height * 2;
+					if rgba_buf.len() as u32 != expected {
 						return Err(DmiError::Generic(String::from(
 							"GrayscaleAlpha buffer length mismatch",
 						)));
 					}
-					let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+					let mut new_buf =
+						Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
 					for chunk in rgba_buf.chunks(2) {
 						let gray = chunk[0];
 						let alpha = chunk[1];
-						new_buf.push(gray);
-						new_buf.push(gray);
-						new_buf.push(gray);
-						new_buf.push(alpha);
+						new_buf.extend_from_slice(&[gray, gray, gray, alpha]);
 					}
 					rgba_buf = new_buf;
 				}
 				ColorType::Grayscale => {
-					if rgba_buf.len() as u32 != info.width * info.height {
+					let expected = frame_info.width * frame_info.height;
+					if rgba_buf.len() as u32 != expected {
 						return Err(DmiError::Generic(String::from(
 							"Grayscale buffer length mismatch",
 						)));
 					}
-					let mut new_buf = Vec::with_capacity((info.width * info.height * 4) as usize);
+					let mut new_buf =
+						Vec::with_capacity((frame_info.width * frame_info.height * 4) as usize);
 					for gray in rgba_buf {
-						new_buf.push(gray);
-						new_buf.push(gray);
-						new_buf.push(gray);
-						new_buf.push(255);
+						new_buf.extend_from_slice(&[gray, gray, gray, 255]);
 					}
 					rgba_buf = new_buf;
 				}
 				ColorType::Rgba => {}
 				_ => {
 					return Err(DmiError::Generic(format!(
-						"Unsupported ColorType (must be RGBA or convertible to RGBA): {:#?}",
-						info.color_type
+						"Unsupported ColorType (must be RGBA or convertible to RGBA): {:?}",
+						frame_info.color_type
 					)));
 				}
 			}
-
-			let dmi_meta = RawDmiMetadata {
-				chunk_ihdr: raw_dmi.chunk_ihdr,
-				chunk_ztxt: raw_dmi.chunk_ztxt.ok_or_else(|| {
-					DmiError::Generic(String::from("Error loading icon: no zTXt chunk found."))
-				})?,
-			};
-
-			(dmi_meta, Some(rgba_buf))
+			Some(rgba_buf)
 		} else {
-			(RawDmi::load_meta(reader)?, None)
+			None
 		};
-
-		let chunk_ztxt = &dmi_meta.chunk_ztxt;
-		let decompressed_text = chunk_ztxt.data.decode()?;
-		let decompressed_text = String::from_utf8(decompressed_text)?;
-		let mut decompressed_text = decompressed_text.lines().peekable();
-
-		let dmi_headers = read_dmi_headers(&mut decompressed_text)?;
-		let version = dmi_headers.version;
-
-		// yes you can make a DMI without a width or height. it defaults to 32x32
-		let width = dmi_headers.width.unwrap_or(32);
-		let height = dmi_headers.height.unwrap_or(32);
-
-		let ihdr_data = dmi_meta.chunk_ihdr.data;
-
-		let img_width: u32 =
-			u32::from_be_bytes([ihdr_data[0], ihdr_data[1], ihdr_data[2], ihdr_data[3]]);
-		let img_height = u32::from_be_bytes([ihdr_data[4], ihdr_data[5], ihdr_data[6], ihdr_data[7]]);
 
 		if img_width == 0
 			|| img_height == 0
@@ -311,7 +308,7 @@ impl Icon {
 
 		let mut index = 0;
 
-		let mut current_line = match decompressed_text.next() {
+		let mut current_line = match decompressed_lines.next() {
 			Some(thing) => thing,
 			None => {
 				return Err(DmiError::Generic(
@@ -346,7 +343,7 @@ impl Icon {
 			let mut unknown_settings = None;
 
 			loop {
-				current_line = match decompressed_text.next() {
+				current_line = match decompressed_lines.next() {
 					Some(thing) => thing,
 					None => {
 						return Err(DmiError::Generic(
@@ -471,7 +468,7 @@ impl Icon {
 		})
 	}
 
-	pub fn save<W: Write>(&self, mut writer: &mut W) -> Result<usize, DmiError> {
+	pub fn save<W: Write>(&self, writer: &mut W) -> Result<usize, DmiError> {
 		let mut sprites = vec![];
 		let mut signature = format!(
 			"# BEGIN DMI\nversion = {}\n\twidth = {}\n\theight = {}\n",
@@ -536,35 +533,38 @@ impl Icon {
 		// Then if it turns out we would have empty rows, we remove them
 		let cell_width = states_rooted as u32;
 		let cell_height = ((sprites.len() as f64) / states_rooted).ceil() as u32;
-		let mut new_png =
-			image::DynamicImage::new_rgba8(cell_width * self.width, cell_height * self.height);
+		let png_width = cell_width * self.width;
+		let png_height = cell_height * self.height;
 
-		for image in sprites.iter().enumerate() {
-			let index = image.0 as u32;
-			let image = image.1;
+		// Compose the sprite sheet
+		let mut new_png = image::DynamicImage::new_rgba8(png_width, png_height);
+		for (index, sprite) in sprites.iter().enumerate() {
+			let index = index as u32;
 			imageops::replace(
 				&mut new_png,
-				*image,
+				*sprite,
 				(self.width * (index % cell_width)).into(),
 				(self.height * (index / cell_width)).into(),
 			);
 		}
 
-		let mut dmi_data = Cursor::new(vec![]);
-		// Use the 'Default' compression - the actual default for the library is 'Fast'
-		let encoder = png::PngEncoder::new_with_quality(
-			&mut dmi_data,
-			png::CompressionType::Default,
-			png::FilterType::Adaptive,
-		);
-		new_png.write_with_encoder(encoder)?;
-		let mut new_dmi = RawDmi::load(&dmi_data.into_inner()[..])?;
+		// Encode
+		let mut png_buf = Cursor::new(Vec::new());
+		{
+			let mut encoder = Encoder::new(&mut png_buf, png_width, png_height);
+			encoder.set_color(ColorType::Rgba);
+			encoder.set_depth(png::BitDepth::Eight);
+			encoder.set_compression(png::Compression::Balanced);
+			encoder.set_filter(png::Filter::Adaptive);
+			encoder.add_ztxt_chunk("Description".to_string(), signature)?;
+			let mut png_writer = encoder.write_header()?;
+			png_writer.write_image_data(new_png.as_bytes())?;
+			png_writer.finish()?;
+		}
 
-		let new_ztxt = ztxt::create_ztxt_chunk(signature.as_bytes())?;
-
-		new_dmi.chunk_ztxt = Some(new_ztxt);
-
-		new_dmi.save(&mut writer, true)
+		let png_bytes = png_buf.into_inner();
+		writer.write_all(&png_bytes)?;
+		Ok(png_bytes.len())
 	}
 }
 
